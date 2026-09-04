@@ -1,4 +1,4 @@
-# ERP Dashboard – PPE Process (Cablage MES)
+# ERP Dashboard – PPE Process 
 
 An ERP / MES (Manufacturing Execution System) dashboard for managing a cable/panel ("cablage") production process. It covers production planning, panel tracking, stock and BOM management, purchasing, maintenance, technician training & certification, and the organizational chart, with a Node.js/Express + Prisma backend and a Next.js frontend.
 
