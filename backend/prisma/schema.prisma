@@ -1,0 +1,708 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  matricule    String    @unique
+  email        String    @unique
+  nom          String
+  mot_de_passe String
+  role         String
+  statut       String    @default("ACTIF")
+  photoUrl     String?
+  phoneNumber  String?
+  hireDate     DateTime?
+
+  // Relations
+  glPlanifications          Planification[]        @relation("GLPlanifications")
+  superviseurPlanifications Planification[]        @relation("SuperviseurPlanifications")
+  superviseurPanneaux       Panneau[]              @relation("SuperviseurPanneaux")
+  timelines                 PanneauTimeline[]
+  assigned_panels           PanneauOperator[]
+  completed_checks          PanneauChecklist[]
+  reported_defects          PanneauDefect[]
+  reported_scraps           PanneauScrap[]
+  panel_history             PanneauHistory[]
+  planification_history     PlanificationHistory[]
+
+  // Organigramme relations
+  organigrammes        Organigramme[]        @relation("OrganigrammeCreator")
+  organigramme_history OrganigrammeHistory[] @relation("OrganigrammeHistoryUser")
+
+  // Nouveaux champs pour la maintenance (Techniciens)
+  department             String?
+  position               String?
+  interventions          Intervention[]
+  formations             Formation[]
+  skills                 Skill[]
+  formation_history      FormationHistory[]
+  preventiveMaintenances PreventiveMaintenance[] @relation("TechnicienPreventive")
+
+  // Formation System (Certification)
+  currentNiveau    String?         @default("Débutant")
+  nextTestDate     DateTime?
+  badges           Badge[]
+  formationTests   FormationTest[]
+  superviseurTests FormationTest[] @relation("SuperviseurTests")
+  certifications   Certification[]
+
+  // Organigramme relations (Tree)
+  managerId String? @db.ObjectId
+  manager      User?  @relation("ManagerSubordinates", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subordinates User[] @relation("ManagerSubordinates")
+
+  // Audit relations
+  auditTargets UserAuditLog[] @relation("UserAuditTarget")
+  auditActions UserAuditLog[] @relation("UserAuditActor")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserAuditLog {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String? @db.ObjectId
+  actorId String? @db.ObjectId
+  action    String // CREATE, UPDATE, DELETE
+  changes   String? // JSON string
+  createdAt DateTime @default(now())
+
+  user  User? @relation("UserAuditTarget", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  actor User? @relation("UserAuditActor", fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Fournisseur {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  nom       String
+  contact   String?
+  articles  Article[]
+  commandes Commande[]
+  createdAt DateTime   @default(now())
+}
+
+model Article {
+  id             String      @id @map("_id") // Custom string ID e.g. "A001"
+  nom_article    String
+  prix           Float // TND
+  quantite       Int         @default(0)
+  reserved_qty   Int         @default(0)
+  min_stock      Int         @default(100)
+  address        String
+  fournisseur_id String @db.ObjectId
+  fournisseur    Fournisseur @relation(fields: [fournisseur_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Relations
+  bomLines          BomLigne[]
+  mouvements        MouvementStock[]
+  reservationLignes ReservationLigne[]
+  commandeLignes    CommandeLigne[]
+  scraps            PanneauScrap[]
+  stockLocations    StockLocation[]
+  interventionParts InterventionPart[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([nom_article])
+  @@index([fournisseur_id])
+}
+
+model BOM {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  nom_projet   String
+  nom_bom      String     @unique // E.g. "BOM-2026-014"
+  jig          String
+  contrepartie String
+  clip         String
+  lignes       BomLigne[]
+  panneaux     Panneau[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([nom_projet])
+}
+
+model BomLigne {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  bom_id String @db.ObjectId
+  bom        BOM     @relation(fields: [bom_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  article_id String
+  article    Article @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quantite   Float // Quantité nécessaire (ex: 40 pièces, 15 mètres)
+  prix       Float // Prix de l'article au moment de la BOM
+
+  @@index([bom_id])
+  @@index([article_id])
+}
+
+model Entrepot {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  nom         String
+  emplacement String?
+  panneaux    Panneau[]
+  createdAt   DateTime  @default(now())
+}
+
+model Planification {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  title                 String
+  project               String?
+  customer              String?
+  priority              String   @default("NORMAL")
+  date_debut            DateTime
+  date_fin              DateTime
+  status                String   @default("BROUILLON") // BROUILLON, PLANIFIE, EN_PRODUCTION, TERMINE, ANNULE
+  progress              Float    @default(0.0)
+  matricule_gl          String
+  gl                    User     @relation("GLPlanifications", fields: [matricule_gl], references: [matricule], onDelete: NoAction, onUpdate: NoAction)
+  matricule_superviseur String
+  superviseur           User     @relation("SuperviseurPlanifications", fields: [matricule_superviseur], references: [matricule], onDelete: NoAction, onUpdate: NoAction)
+
+  // Relations
+  panneaux   Panneau[]
+  mouvements MouvementStock[]
+  history    PlanificationHistory[]
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+}
+
+model Panneau {
+  id                String @id @map("_id") // Custom string ID e.g. "PNL-104"
+  title_panneau     String
+  title_project     String
+  etat_construction String @default("EN_CONSTRUCTION")
+  etat_validation   String @default("EN_ATTENTE")
+  etat_khm          String @default("EN_ATTENTE")
+
+  status            String    @default("READY")
+  priority          String    @default("NORMAL")
+  start_date        DateTime?
+  end_date          DateTime?
+  planned_time      Int?
+  actual_time       Int?
+  parent_panneau_id String?
+  parent_panneau    Panneau?  @relation("PanneauSplits", fields: [parent_panneau_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  child_panneaux    Panneau[] @relation("PanneauSplits")
+
+  bom_id String @db.ObjectId
+  bom            BOM       @relation(fields: [bom_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  entrepot_id String? @db.ObjectId
+  entrepot       Entrepot? @relation(fields: [entrepot_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  superviseur_id String @db.ObjectId
+  superviseur    User      @relation("SuperviseurPanneaux", fields: [superviseur_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  planification_id String? @db.ObjectId
+  planification    Planification? @relation(fields: [planification_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Relations
+  khmControls KhmControl[]
+  timelines   PanneauTimeline[]
+  operators   PanneauOperator[]
+  checklists  PanneauChecklist[]
+  defects     PanneauDefect[]
+  scraps      PanneauScrap[]
+  history     PanneauHistory[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model MouvementStock {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  type             String
+  po_reference     String? // Uniquement pour ENTREE
+  planification_id String? @db.ObjectId // Uniquement pour ENTREE
+  planification    Planification? @relation(fields: [planification_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  panneau_id       String? // Uniquement pour SORTIE vers panneau (pour éviter double déduction)
+  article_id       String
+  article          Article        @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  emplacement      String // Emplacement dans le stock (ex: A-12)
+  quantite         Int
+  etat             Boolean? // Reçu oui/non (pour ENTREE)
+  matricule        String? // Matricule de l'opérateur (pour SORTIE)
+  reste            Int // Quantité restante calculée côté serveur
+  createdAt        DateTime       @default(now())
+  scraps           PanneauScrap[]
+
+  @@index([article_id, type])
+  @@index([article_id, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+}
+
+model KhmControl {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  panneau_id            String
+  panneau               Panneau  @relation(fields: [panneau_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  etat                  String
+  matricule_superviseur String
+  commentaire           String?
+  createdAt             DateTime @default(now())
+}
+
+model Reservation {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  reference String             @unique // e.g., CMD001
+  client    String
+  status    String             @default("TERMINE")
+  total     Float              @default(0.0)
+  lignes    ReservationLigne[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model ReservationLigne {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  reservation_id String @db.ObjectId
+  reservation    Reservation @relation(fields: [reservation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  article_id     String
+  article        Article     @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quantite       Int
+  prix           Float // Unit price at the time of the order
+}
+
+model Commande {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  reference      String          @unique
+  fournisseur_id String @db.ObjectId
+  fournisseur    Fournisseur     @relation(fields: [fournisseur_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status         String          @default("PENDING")
+  total          Float           @default(0)
+  lignes         CommandeLigne[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model CommandeLigne {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  commande_id String @db.ObjectId
+  commande    Commande @relation(fields: [commande_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  article_id  String
+  article     Article  @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quantite    Int
+  prix        Float
+}
+
+model PanneauTimeline {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  panneau_id String
+  panneau    Panneau  @relation(fields: [panneau_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  event_type String
+  user_id String? @db.ObjectId
+  user       User?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reason     String?
+  timestamp  DateTime @default(now())
+}
+
+model PanneauOperator {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  panneau_id    String
+  panneau       Panneau  @relation(fields: [panneau_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user_id String @db.ObjectId
+  user          User     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  role_on_panel String
+  assigned_at   DateTime @default(now())
+}
+
+model PanneauChecklist {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  panneau_id String
+  panneau    Panneau   @relation(fields: [panneau_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  stage      String
+  task_name  String
+  is_done    Boolean   @default(false)
+  done_by String? @db.ObjectId
+  user       User?     @relation(fields: [done_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  done_at    DateTime?
+}
+
+model PanneauDefect {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  panneau_id  String
+  panneau     Panneau   @relation(fields: [panneau_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  defect_type String
+  description String?
+  quantity    Int       @default(1)
+  status      String    @default("OPEN")
+  reported_by String @db.ObjectId
+  user        User      @relation(fields: [reported_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reported_at DateTime  @default(now())
+  closed_at   DateTime?
+}
+
+model PanneauScrap {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  panneau_id         String
+  panneau            Panneau         @relation(fields: [panneau_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  article_id         String
+  article            Article         @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  scrap_quantity     Int
+  planned_quantity   Int?
+  reason             String?
+  mouvement_stock_id String? @db.ObjectId
+  mouvement          MouvementStock? @relation(fields: [mouvement_stock_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reported_by String @db.ObjectId
+  user               User            @relation(fields: [reported_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reported_at        DateTime        @default(now())
+}
+
+model PanneauHistory {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  panneau_id     String
+  panneau        Panneau  @relation(fields: [panneau_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user_id String? @db.ObjectId
+  user           User?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  action         String
+  previous_state String?
+  new_state      String?
+  notes          String?
+  timestamp      DateTime @default(now())
+}
+
+model PlanificationHistory {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  planification_id String? @db.ObjectId
+  planification    Planification? @relation(fields: [planification_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user_id String? @db.ObjectId
+  user             User?          @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  action           String // CREATE, UPDATE, DELETE, STATUS_CHANGE, PROGRESSION_CHANGE
+  oldValue         String?
+  newValue         String?
+  description      String?
+  timestamp        DateTime       @default(now())
+}
+
+// --- MAINTENANCE MODULE ---
+
+model Machine {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  nom                    String
+  code                   String                  @unique // e.g. MACH-01
+  departement            String?
+  status                 String                  @default("RUNNING")
+  totalOperatingHours    Int                     @default(0)
+  interventions          Intervention[]
+  preventiveMaintenances PreventiveMaintenance[]
+  createdAt              DateTime                @default(now())
+}
+
+model Intervention {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  code        String  @unique
+  title       String?
+  description String?
+
+  machineId String? @db.ObjectId
+  machine          Machine?               @relation(fields: [machineId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  technicienId String? @db.ObjectId
+  technicien       User?                  @relation(fields: [technicienId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  preventivePlanId String? @db.ObjectId
+  preventivePlan   PreventiveMaintenance? @relation(fields: [preventivePlanId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  type     String  @default("Corrective") // Corrective, Préventive, Predictive, Inspection
+  priority String  @default("Normal") // Basse, Normal, Haute, Critique, Urgent
+  status   String  @default("PLANIFIÉE") // PLANIFIÉE, EN_ATTENTE, EN_COURS, TERMINÉE, ANNULÉE
+  shift    String? // Matin, Après-midi, Nuit
+
+  plannedStart DateTime?
+  plannedEnd   DateTime?
+  actualStart  DateTime?
+  actualEnd    DateTime?
+
+  defaut       String? // Legacy field
+  cause        String?
+  action       String?
+  result       String?
+  observations String?
+
+  startDate            DateTime? // Legacy
+  endDate              DateTime? // Legacy
+  downtime             Float? // Downtime in hours
+  interventionDuration Float? // Intervention duration in hours
+
+  parts InterventionPart[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InterventionPart {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  interventionId String @db.ObjectId
+  intervention   Intervention @relation(fields: [interventionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  articleId      String
+  article        Article      @relation(fields: [articleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quantite       Float
+
+  createdAt DateTime @default(now())
+}
+
+model Skill {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  technicienId String @db.ObjectId
+  technicien     User      @relation(fields: [technicienId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  name           String // e.g., "Sertissage", "Automatismes"
+  level          Int       @default(0) // 0: Not Trained, 1: Beginner, 2: Confirmed, 3: Expert
+  lastTraining   DateTime?
+  trainer        String?
+  lastEval       DateTime?
+  certExpiration DateTime?
+}
+
+model FormationCatalog {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  name String @unique
+}
+
+model Formation {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  technicienId String @db.ObjectId
+  technicien         User               @relation(fields: [technicienId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  formationName      String
+  trainer            String?
+  startDate          DateTime
+  endDate            DateTime?
+  theoryTest         Float?
+  practicalTest      Float?
+  progress           Int                @default(0)
+  finalScore         Float?
+  certStatus         String             @default("In Progress") // Not Started, In Progress, Certified, Expired, Failed
+  skillLevel         String             @default("Beginner")
+  certificationDate  DateTime?
+  expirationDate     DateTime?
+  createdAt          DateTime           @default(now())
+  formationHistories FormationHistory[]
+  formationTests     FormationTest[]
+  certifications     Certification[]
+}
+
+model FormationHistory {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  formation_id String @db.ObjectId
+  formation      Formation @relation(fields: [formation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user_id String? @db.ObjectId
+  user           User?     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  action         String
+  previous_state String?
+  new_state      String?
+  timestamp      DateTime  @default(now())
+}
+
+// --- STOCK LOCATION (per Article + Location) ---
+
+model StockLocation {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  articleId String
+  location  String
+  quantite  Int    @default(0)
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([articleId, location])
+  @@index([articleId, quantite(sort: Desc)])
+}
+
+model ImportHistory {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  fileHash  String   @unique
+  fileName  String
+  createdAt DateTime @default(now())
+}
+
+// --- ORGANIGRAMME WORKFLOW ---
+
+model Organigramme {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  titre       String
+  description String?
+  snapshot    String
+  statut      String  @default("BROUILLON")
+  version     Int     @default(1)
+
+  submittedBy String? @db.ObjectId
+  validatedBy String? @db.ObjectId
+  rejectedBy String? @db.ObjectId
+  rejectionReason String?
+
+  submittedAt DateTime?
+  validatedAt DateTime?
+  rejectedAt  DateTime?
+  archivedAt  DateTime?
+
+  createdBy String @db.ObjectId
+  creator   User @relation("OrganigrammeCreator", fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  history OrganigrammeHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrganigrammeHistory {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  organigramme_id String @db.ObjectId
+  organigramme    Organigramme @relation(fields: [organigramme_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  previous_status String
+  new_status      String
+
+  user_id String? @db.ObjectId
+  user    User? @relation("OrganigrammeHistoryUser", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  comment          String? // Optional comment
+  rejection_reason String? // Required when rejecting
+
+  timestamp DateTime @default(now())
+}
+
+// --- FORMATION CERTIFICATION (TESTS & BADGES) ---
+
+model FormationTest {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  technicienId String @db.ObjectId
+  technicien    User  @relation(fields: [technicienId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  superviseurId String? @db.ObjectId
+  superviseur   User? @relation("SuperviseurTests", fields: [superviseurId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  niveauEvalue String
+  dateTest     DateTime
+  score        Float?
+  resultat     String   @default("A_VENIR") // A_VENIR, AUJOURDHUI, EN_RETARD, TERMINE, REUSSI, ECHOUE
+
+  promotion      Boolean @default(false)
+  previousNiveau String?
+  newNiveau      String?
+
+  items FormationTestItem[]
+
+  formationId String? @db.ObjectId
+  formation      Formation?      @relation(fields: [formationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  certifications Certification[]
+  badges         Badge[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FormationTestItem {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  formationTestId String @db.ObjectId
+  formationTest   FormationTest @relation(fields: [formationTestId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  category        String
+  question        String
+  description     String?
+  points          Int           @default(1)
+  required        Boolean       @default(true)
+  order           Int           @default(0)
+  isConforme      Boolean?
+  correctAnswer   Boolean       @default(true)
+}
+
+model Badge {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  badgeId       String   @unique
+  technicienId String @db.ObjectId
+  technicien    User     @relation(fields: [technicienId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  niveau        String
+  badgeType     String
+  dateObtention DateTime @default(now())
+
+  testId String? @db.ObjectId
+  test            FormationTest? @relation(fields: [testId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  certificationId String? @db.ObjectId
+  certification   Certification? @relation(fields: [certificationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Certification {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  technicienId String @db.ObjectId
+  technicien     User           @relation(fields: [technicienId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  testId String? @db.ObjectId
+  test           FormationTest? @relation(fields: [testId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  formationId String? @db.ObjectId
+  formation      Formation?     @relation(fields: [formationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nom            String
+  type           String // e.g. "Niveau 1", "Niveau 2", etc.
+  dateObtention  DateTime       @default(now())
+  dateExpiration DateTime?
+  statut         String         @default("VALIDE") // VALIDE, EXPIRANT_BIENTOT, EXPIREE
+  badges         Badge[]
+  createdAt      DateTime       @default(now())
+}
+
+model FormationChecklistTemplate {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  niveau      String                   @unique
+  title       String
+  description String?
+  active      Boolean                  @default(true)
+  items       FormationChecklistItem[]
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+}
+
+model FormationChecklistItem {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  templateId String @db.ObjectId
+  template    FormationChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  category    String
+  question    String
+  description String?
+  order       Int                        @default(0)
+  points      Int                        @default(1)
+  required    Boolean                    @default(true)
+  active      Boolean                    @default(true)
+  isConforme  Boolean                    @default(true)
+}
+
+// --- PREVENTIVE MAINTENANCE ---
+
+model PreventiveMaintenance {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  code         String  @unique // e.g. "PM-00001"
+  machineId String @db.ObjectId
+  machine      Machine @relation(fields: [machineId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  technicienId String? @db.ObjectId
+  technicien   User?   @relation("TechnicienPreventive", fields: [technicienId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  type      String @default("PREVENTIVE")
+  frequency String // DAILY, WEEKLY, MONTHLY, QUARTERLY, SEMI_ANNUALLY, ANNUALLY
+
+  lastMaintenanceDate DateTime?
+  nextMaintenanceDate DateTime
+
+  status       String  @default("PLANNED") // PLANNED, TO_DO, IN_PROGRESS, COMPLETED, OVERDUE
+  description  String?
+  observations String?
+  duration     Float? // hours
+
+  checklistItems PreventiveChecklistItem[]
+  interventions  Intervention[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PreventiveChecklistItem {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  preventiveMaintenanceId String @db.ObjectId
+  preventiveMaintenance   PreventiveMaintenance @relation(fields: [preventiveMaintenanceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  description    String
+  status         String    @default("PENDING") // PENDING, OK, NOK
+  comment        String?
+  inspectionDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Counter {
+  id  String @id @map("_id")
+  seq Int    @default(0)
+}

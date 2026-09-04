@@ -1,0 +1,8 @@
+
+backend/mongo_data/
+
+backend/mongo_data/
+backend/prisma/*.db
+backend/prisma/*.db.*
+
+backend/uploads/
