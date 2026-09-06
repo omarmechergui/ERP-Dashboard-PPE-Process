@@ -4,14 +4,18 @@ const crypto = require('crypto');
 
 // Helper to determine the next level and badge
 const getNextLevelInfo = (currentLevel) => {
-  switch (currentLevel) {
-    case 'Débutant': return { niveau: 'Niveau 1', badge: 'BRONZE' };
-    case 'Niveau 1': return { niveau: 'Niveau 2', badge: 'SILVER' };
-    case 'Niveau 2': return { niveau: 'Niveau 3', badge: 'GOLD' };
-    case 'Niveau 3': return { niveau: 'Expert', badge: 'EXPERT' };
-    case 'Expert': return { niveau: 'Expert', badge: 'EXPERT' }; // max level
-    default: return { niveau: 'Niveau 1', badge: 'BRONZE' };
+  if (!currentLevel || currentLevel === 'Débutant') return { niveau: 'Niveau 1', badge: 'BRONZE' };
+  if (currentLevel === 'Niveau 1') return { niveau: 'Niveau 2', badge: 'SILVER' };
+  if (currentLevel === 'Niveau 2') return { niveau: 'Niveau 3', badge: 'GOLD' };
+  if (currentLevel === 'Niveau 3') return { niveau: 'Expert', badge: 'EXPERT' };
+  
+  if (currentLevel.startsWith('Expert')) {
+    const parts = currentLevel.split(' ');
+    if (parts.length === 1) return { niveau: 'Expert 2', badge: 'EXPERT' };
+    const num = parseInt(parts[1], 10);
+    return { niveau: `Expert ${num + 1}`, badge: 'EXPERT' };
   }
+  return { niveau: 'Niveau 1', badge: 'BRONZE' };
 };
 
 const getDashboardInfo = async (req, res, next) => {
@@ -99,7 +103,35 @@ const getTechniciensList = async (req, res, next) => {
       orderBy: { nom: 'asc' }
     });
 
-    res.json(techniciens);
+    const now = new Date();
+    const enriched = techniciens.map(t => {
+      let isEligible = false;
+      let reason = "";
+      if (t.hireDate) {
+         const monthsSinceHire = (now - t.hireDate) / (1000 * 60 * 60 * 24 * 30.44);
+         const currentNiveau = t.currentNiveau || 'Débutant';
+         
+         if (currentNiveau === 'Débutant' && monthsSinceHire >= 3) {
+            isEligible = true;
+            reason = "3 mois d'ancienneté";
+         } else if (currentNiveau === 'Niveau 1' && monthsSinceHire >= 6) {
+            isEligible = true;
+            reason = "6 mois d'ancienneté";
+         } else if (currentNiveau === 'Niveau 2' && monthsSinceHire >= 12) {
+            isEligible = true;
+            reason = "1 an d'ancienneté";
+         }
+      }
+      
+      if (t.nextTestDate && now >= t.nextTestDate) {
+        isEligible = true;
+        reason = "Date prévue atteinte";
+      }
+
+      return { ...t, isEligible, eligibilityReason: reason };
+    });
+
+    res.json(enriched);
   } catch (error) {
     next(error);
   }
@@ -363,11 +395,7 @@ const scheduleTest = async (req, res, next) => {
        return res.status(400).json({ error: "L'utilisateur spécifié n'est pas un technicien." });
     }
 
-    if (technicien.currentNiveau === 'Expert') {
-      return res.status(400).json({ error: "Ce technicien a déjà atteint le niveau maximum (Expert)." });
-    }
-
-    const nextInfo = getNextLevelInfo(technicien.currentNiveau || 'Débutant');
+    // Expert cap removed - technicians can progress to Expert N
 
     // Prevent scheduling if already an A_VENIR test exists
     const existingTest = await prisma.formationTest.findFirst({
@@ -381,9 +409,12 @@ const scheduleTest = async (req, res, next) => {
       return res.status(400).json({ error: "Ce technicien a déjà un test planifié en attente." });
     }
 
-    // Load the checklist template for the target level
+    const nextInfo = getNextLevelInfo(technicien.currentNiveau || 'Débutant');
+    
+    // Load the checklist template for the target level (reuse 'Expert' template for all Expert levels)
+    const targetTemplateNiveau = nextInfo.niveau.startsWith('Expert') ? 'Expert' : nextInfo.niveau;
     const template = await prisma.formationChecklistTemplate.findUnique({
-      where: { niveau: nextInfo.niveau },
+      where: { niveau: targetTemplateNiveau },
       include: {
         items: { 
           where: { active: true },
@@ -460,6 +491,16 @@ const getTestDetails = async (req, res, next) => {
       }
     });
     if (!test) return res.status(404).json({ error: "Test non trouvé" });
+
+    // SECURITY: Hide correct answers if the user requesting is the technician taking the test
+    // and the test is not yet completed (or hide it always for them).
+    if (req.user && req.user.id === test.technicienId) {
+      test.items = test.items.map(item => {
+        const { correctAnswer, ...rest } = item;
+        return rest;
+      });
+    }
+
     res.json(test);
   } catch (error) {
     next(error);

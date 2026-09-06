@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, PackageCheck, Package, Clock, AlertTriangle, FileText, CheckCircle2 } from "lucide-react";
+import { X, PackageCheck, Package, Clock, AlertTriangle, FileText, CheckCircle2, Ban } from "lucide-react";
 import API from "@/lib/api";
 
 export default function CommandeDetailsDrawer({ commandeId, onClose, onUpdate }) {
   const [commande, setCommande] = useState(null);
   const [loading, setLoading] = useState(true);
   const [receiving, setReceiving] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     async function fetchDetails() {
@@ -36,6 +37,22 @@ export default function CommandeDetailsDrawer({ commandeId, onClose, onUpdate })
       alert("Erreur lors de la réception de la commande.");
     } finally {
       setReceiving(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!confirm("Êtes-vous sûr de vouloir annuler cette commande ? Cette action est irréversible.")) return;
+    
+    setCancelling(true);
+    try {
+      await API.put(`/commandes/${commandeId}/cancel`);
+      onUpdate();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || "Erreur lors de l'annulation de la commande.");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -108,15 +125,15 @@ export default function CommandeDetailsDrawer({ commandeId, onClose, onUpdate })
                     </div>
                     
                     <div className="flex gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ring-4 ring-white ${commande.status === 'RECEIVED' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                        {commande.status === 'RECEIVED' ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ring-4 ring-white ${commande.status === 'RECEIVED' ? 'bg-emerald-100 text-emerald-600' : commande.status === 'ANNULEE' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
+                        {commande.status === 'RECEIVED' ? <CheckCircle2 className="w-5 h-5" /> : commande.status === 'ANNULEE' ? <Ban className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
                       </div>
                       <div>
                         <h4 className="font-semibold text-slate-800">
-                          {commande.status === 'RECEIVED' ? 'Réceptionnée (Stock mis à jour)' : 'En attente de réception'}
+                          {commande.status === 'RECEIVED' ? 'Réceptionnée (Stock mis à jour)' : commande.status === 'ANNULEE' ? 'Commande annulée' : 'En attente de réception'}
                         </h4>
                         <p className="text-sm text-slate-500">
-                          {commande.status === 'RECEIVED' ? `Le ${new Date(commande.updatedAt).toLocaleDateString("fr-FR", { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : 'L\'expédition du fournisseur est attendue.'}
+                          {commande.status === 'RECEIVED' ? `Le ${new Date(commande.updatedAt).toLocaleDateString("fr-FR", { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : commande.status === 'ANNULEE' ? `Le ${new Date(commande.updatedAt).toLocaleDateString("fr-FR", { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : 'L\'expédition du fournisseur est attendue.'}
                         </p>
                       </div>
                     </div>
@@ -177,18 +194,32 @@ export default function CommandeDetailsDrawer({ commandeId, onClose, onUpdate })
               Fermer
             </button>
             {commande.status === "PENDING" && (
-              <button
-                onClick={handleReceive}
-                disabled={receiving}
-                className="px-4 py-2 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors text-sm flex items-center gap-2 disabled:opacity-50"
-              >
-                {receiving ? (
-                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <PackageCheck className="w-4 h-4" />
-                )}
-                Marquer comme reçue
-              </button>
+              <>
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling || receiving}
+                  className="px-4 py-2 rounded-lg font-medium text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 hover:border-rose-300 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 mr-auto"
+                >
+                  {cancelling ? (
+                    <div className="w-4 h-4 border-2 border-rose-600/20 border-t-rose-600 rounded-full animate-spin" />
+                  ) : (
+                    <Ban className="w-4 h-4" />
+                  )}
+                  Annuler la commande
+                </button>
+                <button
+                  onClick={handleReceive}
+                  disabled={receiving || cancelling}
+                  className="px-4 py-2 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors text-sm flex items-center gap-2 disabled:opacity-50"
+                >
+                  {receiving ? (
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <PackageCheck className="w-4 h-4" />
+                  )}
+                  Marquer comme reçue
+                </button>
+              </>
             )}
           </div>
         )}
@@ -212,6 +243,14 @@ function StatusBadge({ status }) {
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm">
         <CheckCircle2 className="w-3.5 h-3.5" />
         REÇUE
+      </span>
+    );
+  }
+  if (status === "ANNULEE") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 border border-rose-200 shadow-sm">
+        <Ban className="w-3.5 h-3.5" />
+        ANNULÉE
       </span>
     );
   }

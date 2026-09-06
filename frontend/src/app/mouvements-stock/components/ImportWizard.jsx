@@ -111,16 +111,38 @@ export const ImportWizard = ({ isOpen, onClose, onRefresh, user }) => {
     
     // Filter valid rows
     const validRows = previewData.previewRows.filter(r => r.Status === "Valid");
-    const totalBatches = Math.ceil(validRows.length / BATCH_SIZE);
+    
+    // Aggregate duplicates (Article Code + Location) BEFORE sending
+    const aggregated = {};
+    for (const row of validRows) {
+      const code = (row["Article Code"] || "").toString().trim();
+      const loc = (row["Location"] || "").toString().trim();
+      const effLocation = loc || 'N/A';
+      const key = `${code}::${effLocation}`;
+      
+      const qty = Number(row["Quantity"]) || 0;
+      const fournisseurId = row["Fournisseur ID"] || null;
+      
+      if (aggregated[key]) {
+        aggregated[key]["Quantity"] += qty;
+        if (!aggregated[key]["Fournisseur ID"] && fournisseurId) {
+          aggregated[key]["Fournisseur ID"] = fournisseurId;
+        }
+      } else {
+        aggregated[key] = { ...row, Quantity: qty, "Fournisseur ID": fournisseurId || row["Fournisseur ID"] };
+      }
+    }
+    const finalRowsToImport = Object.values(aggregated);
+    const totalRequests = finalRowsToImport.length;
     
     setImportStats({
-      total: validRows.length,
+      total: totalRequests,
       processed: 0,
       imported: 0,
       skipped: previewData.failedCount || 0, // already skipped errors from preview
       errors: previewData.failedRows || [],
       currentBatch: 0,
-      totalBatches
+      totalBatches: totalRequests
     });
 
     let currentImported = 0;
@@ -128,30 +150,32 @@ export const ImportWizard = ({ isOpen, onClose, onRefresh, user }) => {
     let currentSkipped = previewData.failedCount || 0;
     let currentErrors = [...(previewData.failedRows || [])];
 
-    for (let i = 0; i < totalBatches; i++) {
+    for (let i = 0; i < totalRequests; i++) {
       if (cancelledRef.current) break;
 
-      const batchRows = validRows.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+      const singleArticle = finalRowsToImport[i];
       
       try {
         const response = await API.post("/stock/import/batch", {
-          rows: batchRows,
+          rows: [singleArticle],
           matricule: user?.matricule,
-          fileHash: i === 0 ? fileHash : undefined, // Only send hash on first batch
+          fileHash: i === 0 ? fileHash : undefined, // Only send hash on first request
           fileName: i === 0 ? file.name : undefined
         });
 
-        currentImported += response.data.imported;
-        currentSkipped += response.data.skipped;
-        currentErrors = [...currentErrors, ...response.data.errors];
+        const importedCount = Array.isArray(response.data.imported) ? response.data.imported.length : (response.data.imported || 0);
+        const skippedCount = Array.isArray(response.data.ignored) ? response.data.ignored.length : (response.data.skipped || 0);
+        
+        currentImported += importedCount;
+        currentSkipped += skippedCount;
+        currentErrors = [...currentErrors, ...(response.data.errors || [])];
       } catch (err) {
-        currentSkipped += batchRows.length;
         currentErrors.push({
-          error: `Le batch ${i + 1} a échoué complètement: ${err.response?.data?.error || err.message || "Erreur réseau"}`
+          error: `Article ${singleArticle["Article Code"]} n'a pas pu être communiqué au serveur: ${err.response?.data?.error || err.message || "Erreur réseau"}`
         });
       }
 
-      currentProcessed += batchRows.length;
+      currentProcessed++;
       
       setImportStats(prev => ({
         ...prev,

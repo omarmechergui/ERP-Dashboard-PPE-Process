@@ -1,309 +1,611 @@
-import React, { useState, useEffect } from 'react';
-import API from '../../../lib/api';
-import { X, Calendar, User, AlignLeft, Layers, CheckCircle, Save } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+"use client";
 
-export default function PlanificationForm({ isOpen, onClose, onSuccess, initialData = null }) {
-  const [formData, setFormData] = useState({
-    title: '',
-    project: '',
-    customer: '',
-    priority: 'NORMAL',
-    date_debut: '',
-    date_fin: '',
-    matricule_gl: '',
-    matricule_superviseur: '',
-    progress: 0
-  });
+import React, { useState, useEffect } from "react";
+import { X, Calendar, User, FileText, CheckCircle2, ChevronRight, ChevronLeft, Package, Clock, Loader2, Plus, Trash2, Settings, ClipboardList } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { usePlanification } from "../hooks/usePlanification";
+import { format } from "date-fns";
 
-  const [users, setUsers] = useState([]);
+export default function PlanificationForm({ isOpen, onClose, onSubmit, boms = [], users = { gls: [], superviseurs: [] } }) {
+  const { createPlanification } = usePlanification();
+  
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
-  const loadData = async () => {
-    try {
-      const userRes = await API.get('/users/team');
-      setUsers(userRes.data);
-    } catch (err) {
-      console.error(err);
-      setError("Erreur lors du chargement des données de base.");
-    }
-  };
+  const [formData, setFormData] = useState({
+    title: "",
+    project: "",
+    customer: "",
+    description: "",
+    priority: "NORMAL",
+    date_debut: "",
+    date_fin: "",
+    bom_id: "",
+    quantite: "",
+    production_mode: "", // BOM, FIX, MANUEL, or empty
+    matricule_gl: "",
+    matricule_superviseur: "",
+    panneaux: [],
+    actions: []
+  });
 
   useEffect(() => {
     if (isOpen) {
-      const initialize = async () => {
-        await loadData();
-        if (initialData) {
-          setFormData({
-            title: initialData.title || '',
-            project: initialData.project || '',
-            customer: initialData.customer || '',
-            priority: initialData.priority || 'NORMAL',
-            date_debut: initialData.date_debut ? new Date(initialData.date_debut).toISOString().split('T')[0] : '',
-            date_fin: initialData.date_fin ? new Date(initialData.date_fin).toISOString().split('T')[0] : '',
-            matricule_gl: initialData.matricule_gl || '',
-            matricule_superviseur: initialData.matricule_superviseur || '',
-            progress: initialData.progress || 0
-          });
-        } else {
-          setFormData({
-            title: '', project: '', customer: '', priority: 'NORMAL',
-            date_debut: '', date_fin: '', matricule_gl: '', matricule_superviseur: '', progress: 0
-          });
-        }
-      };
-      initialize();
+      setStep(1);
+      setError("");
+      setFormData({
+        title: "",
+        project: "",
+        customer: "",
+        description: "",
+        priority: "NORMAL",
+        date_debut: "",
+        date_fin: "",
+        bom_id: "",
+        quantite: "",
+        production_mode: "",
+        matricule_gl: users.gls?.[0]?.matricule || "",
+        matricule_superviseur: users.superviseurs?.[0]?.matricule || "",
+        panneaux: [],
+        actions: []
+      });
     }
-   
-  }, [isOpen, initialData]);
+  }, [isOpen, users]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  if (!isOpen) return null;
 
-    try {
-      if (initialData) {
-        await API.put(`/planifications/${initialData.id}`, formData);
-      } else {
-        await API.post('/planifications', formData);
+  const handleChange = (e) => {
+    const { name, value, type } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'number' ? (value === "" ? "" : Number(value)) : value
+    }));
+    setError("");
+  };
+
+  const handleNext = () => {
+    if (step === 1) {
+      if (!formData.title || !formData.date_debut || !formData.date_fin) {
+        setError("Veuillez remplir le titre et les dates.");
+        return;
       }
-      onSuccess();
-      onClose();
+      if (new Date(formData.date_debut) > new Date(formData.date_fin)) {
+        setError("La date de fin doit être après la date de début.");
+        return;
+      }
+      if (!formData.matricule_gl || !formData.matricule_superviseur) {
+        setError("Veuillez assigner un GL et un superviseur.");
+        return;
+      }
+    }
+    if (step === 2) {
+      if (formData.production_mode === "BOM") {
+        if (!formData.quantite || formData.quantite <= 0) {
+          setError("La quantité à produire est requise pour le mode BOM.");
+          return;
+        }
+      } else if (formData.production_mode === "FIX") {
+        if (formData.panneaux.length === 0) {
+          setError("Un Fix doit contenir au moins un panneau.");
+          return;
+        }
+      } else if (formData.production_mode === "MANUEL") {
+        if (formData.panneaux.length === 0) {
+          setError("La production manuelle requiert au moins un panneau.");
+          return;
+        }
+      }
+      // If production_mode === "" (Aucun), it's valid as draft.
+    }
+    setStep(prev => prev + 1);
+    setError("");
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const payload = {
+        ...formData,
+        date_debut: new Date(formData.date_debut).toISOString(),
+        date_fin: new Date(formData.date_fin).toISOString(),
+        quantite: formData.quantite === "" ? null : Number(formData.quantite),
+        production_mode: formData.production_mode === "" ? null : formData.production_mode,
+        bom_id: formData.production_mode === "BOM" ? formData.bom_id : null
+      };
+      await createPlanification(payload);
+      onSubmit();
     } catch (err) {
-      setError(err?.response?.data?.error || "Erreur de sauvegarde");
+      setError(err.response?.data?.error || "Une erreur est survenue lors de la création.");
     } finally {
       setLoading(false);
     }
   };
 
+  // Panneaux Management
+  const addPanneau = () => {
+    setFormData(prev => ({
+      ...prev,
+      panneaux: [...prev.panneaux, { title_panneau: `Panneau ${prev.panneaux.length + 1}` }]
+    }));
+  };
+  const updatePanneau = (index, value) => {
+    const newPanneaux = [...formData.panneaux];
+    newPanneaux[index].title_panneau = value;
+    setFormData(prev => ({ ...prev, panneaux: newPanneaux }));
+  };
+  const removePanneau = (index) => {
+    const newPanneaux = formData.panneaux.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, panneaux: newPanneaux }));
+  };
+
+  // Actions Management
+  const addAction = () => {
+    setFormData(prev => ({
+      ...prev,
+      actions: [...prev.actions, { nom: "", description: "", priorite: "NORMAL", obligatoire: false, checklists: [] }]
+    }));
+  };
+  const updateAction = (index, field, value) => {
+    const newActions = [...formData.actions];
+    newActions[index][field] = value;
+    setFormData(prev => ({ ...prev, actions: newActions }));
+  };
+  const removeAction = (index) => {
+    const newActions = formData.actions.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, actions: newActions }));
+  };
+
+  // Checklist Management
+  const addChecklistItem = (actionIndex) => {
+    const newActions = [...formData.actions];
+    newActions[actionIndex].checklists.push({ libelle: "", description: "", obligatoire: true });
+    setFormData(prev => ({ ...prev, actions: newActions }));
+  };
+  const updateChecklistItem = (actionIndex, checklistIndex, field, value) => {
+    const newActions = [...formData.actions];
+    newActions[actionIndex].checklists[checklistIndex][field] = value;
+    setFormData(prev => ({ ...prev, actions: newActions }));
+  };
+  const removeChecklistItem = (actionIndex, checklistIndex) => {
+    const newActions = [...formData.actions];
+    newActions[actionIndex].checklists = newActions[actionIndex].checklists.filter((_, i) => i !== checklistIndex);
+    setFormData(prev => ({ ...prev, actions: newActions }));
+  };
+
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-50/70 backdrop-blur-sm"
-            onClick={onClose}
-          />
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col relative z-10 overflow-hidden"
-          >
-            {/* Header */}
-            <div className="flex justify-between items-center px-8 py-5 border-b border-slate-200 bg-slate-50 backdrop-blur-md">
-              <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200">
-                  <AlignLeft className="w-4 h-4 text-blue-600" />
-                </div>
-                {initialData ? 'Modifier la planification' : 'Nouvelle planification'}
-              </h2>
-              <button 
-                onClick={onClose} 
-                className="p-2 text-slate-500 hover:text-slate-900 rounded-full hover:bg-slate-200 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+      />
+      
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl relative z-10 overflow-hidden flex flex-col h-[90vh]"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 bg-slate-50 flex-shrink-0">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Nouvelle Planification</h2>
+            <p className="text-sm text-slate-500 font-medium mt-1">Configuration de la production (BOM, Fix, Actions)</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Stepper */}
+        <div className="px-8 py-4 bg-white border-b border-slate-100 flex justify-between relative flex-shrink-0">
+          <div className="absolute top-1/2 left-8 right-8 h-0.5 bg-slate-100 -translate-y-1/2 z-0" />
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="relative z-10 flex flex-col items-center gap-2 bg-white px-2">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${
+                step > i ? 'bg-emerald-500 text-white' : step === i ? 'bg-blue-600 text-white ring-4 ring-blue-50' : 'bg-slate-100 text-slate-400'
+              }`}>
+                {step > i ? <CheckCircle2 className="w-5 h-5" /> : i}
+              </div>
+              <span className={`text-xs font-semibold ${step >= i ? 'text-slate-800' : 'text-slate-400'}`}>
+                {i === 1 ? 'Infos' : i === 2 ? 'Production' : i === 3 ? 'Actions' : 'Validation'}
+              </span>
             </div>
+          ))}
+        </div>
 
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              {error && (
-                <div className="mb-6 p-4 bg-rose-50 text-rose-700 rounded-xl border border-rose-200 text-sm font-semibold flex items-center gap-3 shadow-sm">
-                  <X className="w-5 h-5 flex-shrink-0" />
-                  {error}
-                </div>
-              )}
-
-              <form id="plan-form" onSubmit={handleSubmit} className="space-y-10">
-                
-                {/* Section 1: General Info */}
-                <section className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                  <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2 uppercase tracking-wider mb-6">
-                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center border border-blue-200 text-[10px]">1</span>
-                    Informations Générales
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Titre</label>
-                      <input 
-                        type="text" required 
-                        value={formData.title} 
-                        onChange={e => setFormData({...formData, title: e.target.value})} 
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
-                        placeholder="Ex: Prod Semaine 42" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Priorité</label>
-                      <select 
-                        value={formData.priority} 
-                        onChange={e => setFormData({...formData, priority: e.target.value})} 
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                      >
-                        <option value="LOW">Basse</option>
-                        <option value="NORMAL">Normale</option>
-                        <option value="HIGH">Haute</option>
-                        <option value="CRITICAL">Critique</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Projet</label>
-                      <input 
-                        type="text" 
-                        value={formData.project} 
-                        onChange={e => setFormData({...formData, project: e.target.value})} 
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
-                        placeholder="Nom du projet" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Client</label>
-                      <input 
-                        type="text" 
-                        value={formData.customer} 
-                        onChange={e => setFormData({...formData, customer: e.target.value})} 
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
-                        placeholder="Nom du client" 
-                      />
-                    </div>
-                    <div className="space-y-4 md:col-span-2">
-                      <div className="flex justify-between items-center">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Progression ({formData.progress}%)</label>
-                      </div>
-                      <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-xl px-4 py-3">
-                        <input 
-                          type="range" 
-                          min="0" 
-                          max="100" 
-                          step="10"
-                          value={formData.progress} 
-                          onChange={e => setFormData({...formData, progress: parseInt(e.target.value, 10)})} 
-                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                        />
-                        <span className="text-sm font-bold text-white bg-blue-600 px-3 py-1 rounded-full shadow-sm min-w-[3.5rem] text-center">
-                          {formData.progress}%
-                        </span>
-                      </div>
+        {/* Form Body */}
+        <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50">
+          <AnimatePresence mode="wait">
+            
+            {/* STEP 1: Metadata */}
+            {step === 1 && (
+              <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="col-span-2 space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Titre de la planification <span className="text-rose-500">*</span></label>
+                    <input type="text" name="title" value={formData.title} onChange={handleChange} placeholder="Ex: Prod Semaine 42 - F-150" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-medium focus:ring-2 focus:ring-blue-500 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Projet</label>
+                    <input type="text" name="project" value={formData.project} onChange={handleChange} placeholder="Nom du projet" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Client</label>
+                    <input type="text" name="customer" value={formData.customer} onChange={handleChange} placeholder="Nom du client" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Date de début <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      <input type="date" name="date_debut" value={formData.date_debut} onChange={handleChange} className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all" />
                     </div>
                   </div>
-                </section>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                  {/* Section 2: Planning dates */}
-                  <section className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                    <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2 uppercase tracking-wider mb-6">
-                      <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center border border-purple-200 text-[10px]">2</span>
-                      Planning
-                    </h3>
-                    <div className="space-y-6">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                          <Calendar className="w-3 h-3" /> Date de début
-                        </label>
-                        <input 
-                          type="date" required 
-                          value={formData.date_debut} 
-                          onChange={e => setFormData({...formData, date_debut: e.target.value})} 
-                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors [color-scheme:light]" 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                          <Calendar className="w-3 h-3" /> Date de fin
-                        </label>
-                        <input 
-                          type="date" required 
-                          value={formData.date_fin} 
-                          onChange={e => setFormData({...formData, date_fin: e.target.value})} 
-                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors [color-scheme:light]" 
-                        />
-                      </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Date de fin <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      <input type="date" name="date_fin" value={formData.date_fin} onChange={handleChange} className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all" />
                     </div>
-                  </section>
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Description (Optionnelle)</label>
+                    <textarea name="description" value={formData.description} onChange={handleChange} rows={2} placeholder="Ajoutez des notes ou instructions spécifiques..." className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all resize-none" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><User className="w-4 h-4" /> Group Leader <span className="text-rose-500">*</span></label>
+                    <select name="matricule_gl" value={formData.matricule_gl} onChange={handleChange} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-medium focus:ring-2 focus:ring-blue-500 transition-all">
+                      <option value="">Sélectionner un GL</option>
+                      {users.gls?.map(u => <option key={u.matricule} value={u.matricule}>{u.nom} — {u.matricule}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><User className="w-4 h-4" /> Superviseur <span className="text-rose-500">*</span></label>
+                    <select name="matricule_superviseur" value={formData.matricule_superviseur} onChange={handleChange} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-medium focus:ring-2 focus:ring-blue-500 transition-all">
+                      <option value="">Sélectionner un Superviseur</option>
+                      {users.superviseurs?.map(u => <option key={u.matricule} value={u.matricule}>{u.nom} — {u.matricule}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
-                  {/* Section 3: Responsible team */}
-                  <section className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                    <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2 uppercase tracking-wider mb-6">
-                      <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center border border-emerald-200 text-[10px]">3</span>
-                      Équipe Responsable
-                    </h3>
-                    <div className="space-y-6">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                          <User className="w-3 h-3" /> Groupe Leader (GL)
-                        </label>
-                        <select 
-                          required 
-                          value={formData.matricule_gl} 
-                          onChange={e => setFormData({...formData, matricule_gl: e.target.value})} 
-                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-                        >
-                          <option value="">Sélectionner un GL...</option>
-                          {users.filter(u => u.role === 'GL' || u.role === 'ADMIN').map(u => (
-                            <option key={u.id} value={u.matricule}>{u.nom} ({u.matricule})</option>
-                          ))}
-                        </select>
+            {/* STEP 2: Production Source */}
+            {step === 2 && (
+              <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Source de production</label>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    {[
+                      { id: "BOM", label: "Production par BOM", icon: Package, desc: "Basée sur nomenclature" },
+                      { id: "FIX", label: "Production Fix", icon: Settings, desc: "Réparation / Spécifique" },
+                      { id: "MANUEL", label: "Production Manuelle", icon: FileText, desc: "Panneaux personnalisés" },
+                      { id: "", label: "Aucune", icon: Clock, desc: "Brouillon initial" }
+                    ].map(mode => (
+                      <div 
+                        key={mode.id}
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, production_mode: mode.id }));
+                          setError("");
+                        }}
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center text-center gap-2 ${
+                          formData.production_mode === mode.id 
+                            ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                            : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50 text-slate-600'
+                        }`}
+                      >
+                        <mode.icon className="w-6 h-6" />
+                        <div>
+                          <p className="font-bold text-sm">{mode.label}</p>
+                          <p className="text-[10px] text-slate-500 mt-1">{mode.desc}</p>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                          <User className="w-3 h-3" /> Superviseur
-                        </label>
-                        <select 
-                          required 
-                          value={formData.matricule_superviseur} 
-                          onChange={e => setFormData({...formData, matricule_superviseur: e.target.value})} 
-                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-                        >
-                          <option value="">Sélectionner un superviseur...</option>
-                          {users.filter(u => u.role === 'SUPERVISEUR' || u.role === 'ADMIN').map(u => (
-                            <option key={u.id} value={u.matricule}>{u.nom} ({u.matricule})</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </section>
+                    ))}
+                  </div>
                 </div>
 
-              </form>
-            </div>
+                {/* Conditional Fields based on Mode */}
+                <div className="mt-8">
+                  {formData.production_mode === "BOM" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sélection du BOM <span className="text-rose-500">*</span></label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[200px] overflow-y-auto p-1">
+                          {boms.map(bom => (
+                            <div
+                              key={bom.id}
+                              onClick={() => setFormData(prev => ({ ...prev, bom_id: bom.id }))}
+                              className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                formData.bom_id === bom.id 
+                                  ? 'border-blue-500 bg-blue-50' 
+                                  : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              <p className="font-bold text-slate-800 text-sm">{bom.nom_projet}</p>
+                              <p className="text-xs text-slate-500 mt-0.5 font-medium">BOM: {bom.nom_bom} | Jig: {bom.jig}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quantité à produire <span className="text-rose-500">*</span></label>
+                        <input type="number" name="quantite" min="1" value={formData.quantite} onChange={handleChange} className="w-full px-4 py-3 text-lg font-bold bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all" />
+                      </div>
+                    </div>
+                  )}
 
-            {/* Footer */}
-            <div className="px-8 py-5 border-t border-slate-200 bg-slate-50 backdrop-blur-md flex justify-end gap-3">
-              <button 
-                type="button" 
-                onClick={onClose} 
-                className="px-6 py-2.5 text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition-all"
-              >
+                  {(formData.production_mode === "FIX" || formData.production_mode === "MANUEL") && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                      {formData.production_mode === "FIX" && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quantité globale du Fix (Optionnelle)</label>
+                          <input type="number" name="quantite" min="1" value={formData.quantite} onChange={handleChange} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Ex: 50" />
+                          <p className="text-xs text-slate-500">Définit la quantité totale si différente du nombre de panneaux.</p>
+                        </div>
+                      )}
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Panneaux <span className="text-rose-500">*</span></label>
+                          <button onClick={addPanneau} className="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1.5">
+                            <Plus className="w-3.5 h-3.5" /> Ajouter un panneau
+                          </button>
+                        </div>
+                        
+                        {formData.panneaux.length === 0 ? (
+                          <div className="text-center py-8 bg-white rounded-xl border border-dashed border-slate-300">
+                            <p className="text-sm text-slate-500">Aucun panneau défini. Un panneau est requis.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {formData.panneaux.map((panneau, i) => (
+                              <div key={i} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-slate-200">
+                                <span className="w-6 h-6 rounded bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
+                                <input 
+                                  type="text" 
+                                  value={panneau.title_panneau} 
+                                  onChange={(e) => updatePanneau(i, e.target.value)}
+                                  className="flex-1 px-3 py-2 bg-transparent text-sm font-medium focus:outline-none"
+                                  placeholder="Référence / Nom du panneau"
+                                />
+                                <button onClick={() => removePanneau(i)} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.production_mode === "" && (
+                     <div className="text-center py-12">
+                       <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                       <p className="text-slate-600 font-medium">Brouillon initial</p>
+                       <p className="text-sm text-slate-400 mt-1">La planification sera créée sans données de production. Vous pourrez définir le mode plus tard.</p>
+                     </div>
+                  )}
+                </div>
+
+              </motion.div>
+            )}
+
+            {/* STEP 3: Actions Spécifiques */}
+            {step === 3 && (
+              <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">Actions Spécifiques</h3>
+                    <p className="text-sm text-slate-500">Définissez des actions de production personnalisées avec des checklists.</p>
+                  </div>
+                  <button onClick={addAction} className="text-sm font-semibold text-blue-600 bg-blue-50 px-4 py-2 rounded-xl hover:bg-blue-100 transition-colors flex items-center gap-2 shadow-sm">
+                    <Plus className="w-4 h-4" /> Nouvelle Action
+                  </button>
+                </div>
+
+                {formData.actions.length === 0 ? (
+                  <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
+                    <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-slate-500 font-medium">Aucune action spécifique définie</p>
+                    <p className="text-sm text-slate-400 mt-1">Ces actions sont optionnelles et permettent d'ajouter des tâches hors nomenclature.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {formData.actions.map((action, actionIdx) => (
+                      <div key={actionIdx} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-start gap-4">
+                          <div className="flex-1 space-y-3">
+                            <input 
+                              type="text" 
+                              value={action.nom} 
+                              onChange={(e) => updateAction(actionIdx, 'nom', e.target.value)}
+                              placeholder="Nom de l'action (ex: Préparation spéciale connecteur)"
+                              className="w-full text-base font-bold bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:outline-none pb-1"
+                            />
+                            <div className="flex gap-4 items-center">
+                              <select 
+                                value={action.priorite} 
+                                onChange={(e) => updateAction(actionIdx, 'priorite', e.target.value)}
+                                className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-600 border-none focus:ring-0 cursor-pointer"
+                              >
+                                <option value="BASSE">Priorité: Basse</option>
+                                <option value="NORMAL">Priorité: Normale</option>
+                                <option value="HAUTE">Priorité: Haute</option>
+                                <option value="CRITIQUE">Priorité: Critique</option>
+                              </select>
+                              <label className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer">
+                                <input 
+                                  type="checkbox" 
+                                  checked={action.obligatoire}
+                                  onChange={(e) => updateAction(actionIdx, 'obligatoire', e.target.checked)}
+                                  className="rounded text-blue-600 focus:ring-blue-500"
+                                />
+                                Action Obligatoire
+                              </label>
+                            </div>
+                            <input 
+                              type="text" 
+                              value={action.description} 
+                              onChange={(e) => updateAction(actionIdx, 'description', e.target.value)}
+                              placeholder="Description optionnelle..."
+                              className="w-full text-sm text-slate-500 bg-transparent focus:outline-none"
+                            />
+                          </div>
+                          <button onClick={() => removeAction(actionIdx)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors">
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                        
+                        <div className="p-4 bg-white">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Checklist</h4>
+                            <button onClick={() => addChecklistItem(actionIdx)} className="text-[11px] font-bold text-blue-600 hover:text-blue-700 uppercase flex items-center gap-1">
+                              <Plus className="w-3 h-3" /> Ajouter contrôle
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {action.checklists.map((chk, chkIdx) => (
+                              <div key={chkIdx} className="flex gap-3 items-start group">
+                                <input 
+                                  type="checkbox" 
+                                  checked={chk.obligatoire}
+                                  onChange={(e) => updateChecklistItem(actionIdx, chkIdx, 'obligatoire', e.target.checked)}
+                                  className="mt-1 rounded text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                  title="Contrôle obligatoire ?"
+                                />
+                                <div className="flex-1 bg-slate-50 border border-slate-100 rounded-lg p-2 flex items-center">
+                                  <input 
+                                    type="text" 
+                                    value={chk.libelle} 
+                                    onChange={(e) => updateChecklistItem(actionIdx, chkIdx, 'libelle', e.target.value)}
+                                    placeholder="Libellé du contrôle (ex: Vérifier le sertissage)"
+                                    className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none"
+                                  />
+                                </div>
+                                <button onClick={() => removeChecklistItem(actionIdx, chkIdx)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                            {action.checklists.length === 0 && (
+                              <p className="text-xs text-slate-400 italic">Aucun élément de checklist.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* STEP 4: Validation */}
+            {step === 4 && (
+              <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+                  <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
+                    <ClipboardList className="w-5 h-5 text-blue-500" />
+                    Résumé de la Planification
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 gap-y-6 text-sm">
+                    <div>
+                      <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-1">Titre</p>
+                      <p className="font-bold text-slate-800 text-base">{formData.title}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-1">Période</p>
+                      <p className="font-bold text-slate-800">
+                        {formData.date_debut ? format(new Date(formData.date_debut), 'dd/MM/yyyy') : ''} → {formData.date_fin ? format(new Date(formData.date_fin), 'dd/MM/yyyy') : ''}
+                      </p>
+                    </div>
+                    
+                    <div className="col-span-2 border-t border-slate-100" />
+                    
+                    <div>
+                      <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-1">Mode de Production</p>
+                      <p className="font-bold text-blue-600 text-base">
+                        {formData.production_mode === 'BOM' ? 'BOM' : 
+                         formData.production_mode === 'FIX' ? 'Fix' : 
+                         formData.production_mode === 'MANUEL' ? 'Manuelle' : 'Non défini (Brouillon)'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-1">Quantité à produire</p>
+                      <p className="font-bold text-slate-800 text-base">{formData.quantite || '—'}</p>
+                    </div>
+
+                    <div className="col-span-2 grid grid-cols-3 gap-4">
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+                        <p className="text-xl font-black text-slate-700">{formData.production_mode === 'BOM' ? 'Auto' : formData.panneaux.length}</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">Panneaux</p>
+                      </div>
+                      <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 text-center">
+                        <p className="text-xl font-black text-indigo-700">{formData.actions.length}</p>
+                        <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mt-1">Actions</p>
+                      </div>
+                      <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center">
+                        <p className="text-xl font-black text-emerald-700">{formData.actions.reduce((acc, a) => acc + a.checklists.length, 0)}</p>
+                        <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider mt-1">Checklists</p>
+                      </div>
+                    </div>
+
+                    <div className="col-span-2 border-t border-slate-100" />
+
+                    <div>
+                      <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-1">Group Leader</p>
+                      <p className="font-bold text-slate-800">{users.gls?.find(u => u.matricule === formData.matricule_gl)?.nom || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-1">Superviseur</p>
+                      <p className="font-bold text-slate-800">{users.superviseurs?.find(u => u.matricule === formData.matricule_superviseur)?.nom || '—'}</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+          </AnimatePresence>
+        </div>
+
+        {/* Footer */}
+        <div className="px-8 py-5 border-t border-slate-100 bg-white flex items-center justify-between flex-shrink-0 z-20 relative shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+          <div className="flex-1">
+            {error && (
+              <p className="text-sm font-semibold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 inline-block animate-in fade-in">
+                {error}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-3">
+            {step > 1 ? (
+              <button onClick={() => setStep(prev => prev - 1)} className="px-6 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors flex items-center gap-2" disabled={loading}>
+                <ChevronLeft className="w-4 h-4" /> Retour
+              </button>
+            ) : (
+              <button onClick={onClose} className="px-6 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-colors" disabled={loading}>
                 Annuler
               </button>
-              <button 
-                type="submit" 
-                form="plan-form"
-                disabled={loading}
-                className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 border border-blue-500 shadow-sm hover:shadow-md rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Enregistrement...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Enregistrer
-                  </>
-                )}
+            )}
+
+            {step < 4 ? (
+              <button onClick={handleNext} className="px-8 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-sm transition-colors flex items-center gap-2 shadow-blue-500/20">
+                Suivant <ChevronRight className="w-4 h-4" />
               </button>
-            </div>
-          </motion.div>
+            ) : (
+              <button onClick={handleSubmit} disabled={loading} className="px-8 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50 shadow-emerald-500/20">
+                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Enregistrement...</> : <><CheckCircle2 className="w-4 h-4" /> Enregistrer la planification</>}
+              </button>
+            )}
+          </div>
         </div>
-      )}
-    </AnimatePresence>
+      </motion.div>
+    </div>
   );
 }

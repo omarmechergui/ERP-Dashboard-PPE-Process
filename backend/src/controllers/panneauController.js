@@ -9,9 +9,10 @@ const panneauSchema = z.object({
   etat_construction: z.enum(['EN_CONSTRUCTION', 'EN_VALIDATION', 'KHM', 'TERMINE']).default('EN_CONSTRUCTION'),
   etat_validation: z.enum(['EN_ATTENTE', 'VALIDE', 'REJETE']).default('EN_ATTENTE'),
   etat_khm: z.enum(['EN_ATTENTE', 'CONFORME', 'NON_CONFORME']).default('EN_ATTENTE'),
-  bom_id: z.coerce.number().int("L'ID du BOM est requis"),
-  entrepot_id: z.coerce.number().int("L'ID de l'entrepôt doit être un entier").nullable().optional(),
+  bom_id: z.string().min(1, "L'ID du BOM est requis"),
+  entrepot_id: z.string().nullable().optional(),
   superviseur_id: z.string().min(1, "L'ID du superviseur est requis"),
+  planification_id: z.string().nullable().optional(),
 });
 
 const patchEtatSchema = z.object({
@@ -143,8 +144,8 @@ const getPanneauById = async (req, res, next) => {
 // @access  Private (SUPERVISEUR, ADMIN)
 const createPanneau = async (req, res, next) => {
   try {
-    const { id, title_panneau, title_project, superviseur_id, priority = "NORMAL", planned_time } = req.body;
-    // Coerce IDs to integers since form sends strings
+    const { id, title_panneau, title_project, superviseur_id, priority = "NORMAL", planned_time, planification_id } = req.body;
+    
     const bom_id = req.body.bom_id || null;
     const entrepot_id = req.body.entrepot_id || null;
 
@@ -161,6 +162,7 @@ const createPanneau = async (req, res, next) => {
       bom_id,
       entrepot_id,
       superviseur_id,
+      planification_id,
     };
     
     // Quick validation ignoring some strict fields if we didn't update the Zod schema yet

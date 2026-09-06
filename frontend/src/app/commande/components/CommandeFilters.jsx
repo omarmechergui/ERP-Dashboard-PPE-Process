@@ -31,6 +31,7 @@ export default function CommandeFilters({ filters, setFilters, clearFilters }) {
             <option value="ALL">Tous les statuts</option>
             <option value="PENDING">En attente</option>
             <option value="RECEIVED">Reçue</option>
+            <option value="ANNULEE">Annulée</option>
           </select>
         </div>
       </div>
@@ -51,7 +52,7 @@ export default function CommandeFilters({ filters, setFilters, clearFilters }) {
 
           {filters.status !== "ALL" && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-              Statut: {filters.status === "PENDING" ? "En attente" : "Reçue"}
+              Statut: {filters.status === "PENDING" ? "En attente" : filters.status === "RECEIVED" ? "Reçue" : "Annulée"}
               <button onClick={() => setFilters({ ...filters, status: "ALL" })} className="hover:text-blue-900">
                 <X className="w-3 h-3" />
               </button>

@@ -4,13 +4,14 @@
 import React, { useState, useEffect } from "react";
 import { X, Save } from "lucide-react";
 
-export default function EditPanneauModal({ isOpen, onClose, onSubmit, panneau, boms, entrepots, supervisors }) {
+export default function EditPanneauModal({ isOpen, onClose, onSubmit, panneau, boms, entrepots, supervisors, planifications = [] }) {
   const [formData, setFormData] = useState({
     title_panneau: "",
     title_project: "",
     bom_id: "",
     entrepot_id: "",
-    superviseur_id: ""
+    superviseur_id: "",
+    planification_id: ""
   });
   const [error, setError] = useState("");
 
@@ -21,11 +22,12 @@ export default function EditPanneauModal({ isOpen, onClose, onSubmit, panneau, b
         title_project: panneau.title_project || "",
         bom_id: panneau.bom_id ? String(panneau.bom_id) : (boms.length > 0 ? String(boms[0].id) : ""),
         entrepot_id: panneau.entrepot_id ? String(panneau.entrepot_id) : "",
-        superviseur_id: panneau.superviseur_id ? String(panneau.superviseur_id) : (supervisors.length > 0 ? String(supervisors[0].matricule || supervisors[0].id) : "")
+        superviseur_id: panneau.superviseur_id ? String(panneau.superviseur_id) : (supervisors.length > 0 ? String(supervisors[0].matricule || supervisors[0].id) : ""),
+        planification_id: panneau.planification_id ? String(panneau.planification_id) : ""
       });
       setError("");
     }
-  }, [isOpen, panneau, boms, entrepots, supervisors]);
+  }, [isOpen, panneau, boms, entrepots, supervisors, planifications]);
 
   if (!isOpen || !panneau) return null;
 
@@ -35,6 +37,7 @@ export default function EditPanneauModal({ isOpen, onClose, onSubmit, panneau, b
       ...prev,
       [name]: name === "bom_id" ? (value || null)
             : name === "entrepot_id" ? (value || null)
+            : name === "planification_id" ? (value || null)
             : value
     }));
   };
@@ -144,6 +147,23 @@ export default function EditPanneauModal({ isOpen, onClose, onSubmit, panneau, b
               {entrepots.length === 0 && <option value="" disabled>Aucun entrepôt disponible</option>}
               {entrepots.map((e) => (
                 <option key={e.id} value={e.id} className="text-slate-900">{e.nom} {e.emplacement ? `(${e.emplacement})` : ''}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              Planification liée
+            </label>
+            <select
+              name="planification_id"
+              value={formData.planification_id || ""}
+              onChange={handleInputChange}
+              className={`w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm ${!formData.planification_id ? 'text-slate-400' : ''}`}
+            >
+              <option value="">Aucune planification (Optionnel)</option>
+              {planifications.map((p) => (
+                <option key={p.id} value={p.id} className="text-slate-900">{p.title} - {p.project || "Sans projet"}</option>
               ))}
             </select>
           </div>

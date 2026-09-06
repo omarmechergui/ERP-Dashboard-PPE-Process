@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/immutability */
+ 
 import React, { useState, useEffect } from 'react';
 import API from '../../../lib/api';
 import { UserAvatar } from './UserAvatar';

@@ -11,6 +11,7 @@ import ReservationTable from "./components/ReservationTable";
 import ReservationFilters from "./components/ReservationFilters";
 import ReservationBulkActions from "./components/ReservationBulkActions";
 import ReservationDetailsDrawer from "./components/ReservationDetailsDrawer";
+import PageHeader from "@/components/ui/PageHeader";
 
 export default function ReservationPage() {
   const { user } = useAuth();
@@ -93,38 +94,35 @@ export default function ReservationPage() {
   }, [reservations, filters]);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-8">
+    <div className="min-h-screen bg-background p-4 lg:p-8">
       <div className="max-w-[1400px] mx-auto space-y-6">
 
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-              Réservations de Stock
-            </h1>
-            <p className="text-slate-500 text-sm mt-1">
-              Centre de contrôle des réservations et de la disponibilité des articles
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleRefresh}
-              className="p-2 text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow transition-all"
-              title="Rafraîchir"
-            >
-              <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin text-blue-500" : ""}`} />
-            </button>
-            {isWriteAllowed && (
+        <PageHeader 
+          icon={Package}
+          title="Réservations de Stock"
+          description="Centre de contrôle des réservations et de la disponibilité des articles"
+          action={
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => setIsWizardOpen(true)}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium shadow-sm transition-all active:scale-[0.98]"
+                onClick={handleRefresh}
+                className="p-2 text-secondary-foreground hover:text-foreground bg-card border border-border rounded-lg shadow-sm hover:shadow transition-all"
+                title="Rafraîchir"
               >
-                <Plus className="w-4 h-4" />
-                Nouvelle Réservation
+                <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin text-primary" : ""}`} />
               </button>
-            )}
-          </div>
-        </div>
+              {isWriteAllowed && (
+                <button
+                  onClick={() => setIsWizardOpen(true)}
+                  className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all hover:-translate-y-0.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nouvelle Réservation
+                </button>
+              )}
+            </div>
+          }
+        />
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -231,15 +229,15 @@ function KpiCard({ title, value, icon, bg, onClick, active }) {
   return (
     <div
       onClick={onClick}
-      className={`p-4 rounded-xl border ${active ? 'border-blue-400 ring-1 ring-blue-400' : 'border-slate-200'} bg-white shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between h-24 relative overflow-hidden`}
+      className={`p-4 rounded-xl border ${active ? 'border-primary ring-1 ring-primary' : 'border-border'} bg-card shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between h-24 relative overflow-hidden`}
     >
       <div className="flex justify-between items-start">
-        <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">{title}</h3>
+        <h3 className="text-xs font-medium text-secondary-foreground uppercase tracking-wider">{title}</h3>
         <div className={`p-1.5 rounded-lg ${bg}`}>
           {icon}
         </div>
       </div>
-      <div className="text-2xl font-bold text-slate-900">{value}</div>
+      <div className="text-2xl font-bold text-foreground">{value}</div>
     </div>
   );
 }

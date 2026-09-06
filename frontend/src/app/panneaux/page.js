@@ -11,6 +11,8 @@ import CreatePanneauModal from "./components/CreatePanneauModal";
 import EditPanneauModal from "./components/EditPanneauModal";
 import DetailPanneauModal from "./components/DetailPanneauModal";
 import HistoryModal from "./components/HistoryModal";
+import PageHeader from "@/components/ui/PageHeader";
+import LoadingState from "@/components/ui/LoadingSkeleton";
 
 // --- Sub-components for UI ---
 const Toast = ({ show, type, message, onClose }) => {
@@ -78,6 +80,7 @@ export default function PanneauxPage() {
     boms,
     entrepots,
     supervisors,
+    planifications,
     loading: dataLoading,
     error,
     fetchAll,
@@ -135,7 +138,7 @@ export default function PanneauxPage() {
       showToast('success', `Panneau déplacé vers ${destColumn}`);
       // UI updates automatically because updatePanneauStatus updates context state
     } catch (err) {
-      showToast('error', err.error || "Erreur lors du déplacement du panneau");
+      showToast('error', err?.message || err?.error || "Erreur lors du déplacement du panneau");
     } finally {
       setLoadingPanneauId(null);
     }
@@ -187,7 +190,7 @@ export default function PanneauxPage() {
       setCreateModalOpen(false);
       showToast('success', "Panneau créé avec succès");
     } catch (err) {
-      showToast('error', err.error || "Erreur lors de la création du panneau");
+      showToast('error', err?.message || err?.error || "Erreur lors de la création du panneau");
     }
   };
 
@@ -201,7 +204,7 @@ export default function PanneauxPage() {
       setEditModal({ isOpen: false, panneau: null });
       showToast('success', `Panneau ${id} modifié avec succès`);
     } catch (err) {
-      showToast('error', err?.response?.data?.error || err?.error || "Erreur lors de la modification du panneau");
+      showToast('error', err?.message || err?.response?.data?.error || err?.error || "Erreur lors de la modification du panneau");
     }
   };
 
@@ -215,7 +218,7 @@ export default function PanneauxPage() {
         await deletePanneau(panneau.id);
         showToast('success', `Panneau ${panneau.id} supprimé avec succès`);
       } catch (err) {
-        showToast('error', err?.response?.data?.error || err?.error || "Erreur lors de la suppression du panneau");
+        showToast('error', err?.message || err?.response?.data?.error || err?.error || "Erreur lors de la suppression du panneau");
       }
     }
   };
@@ -225,52 +228,42 @@ export default function PanneauxPage() {
   };
 
   if (dataLoading && !panneaux.length) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
-        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-        <p className="text-sm font-medium text-slate-500 tracking-wide">Chargement de l&apos;environnement MES...</p>
-      </div>
-    );
+    return <LoadingState type="dashboard" />;
   }
 
   // Pass loading state to KanbanBoard items (we can inject it by modifying the array passed or via a prop)
   // For simplicity, we pass `loadingPanneauId` to KanbanBoard
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
       <div className="max-w-[1600px] mx-auto space-y-6">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-              <LayoutDashboard className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Panneaux (Kanban)</h1>
-              <p className="text-sm text-slate-500 mt-0.5">Suivi de production MES et assemblage</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={fetchAll}
-              className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
-              title="Rafraîchir"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </button>
-            
-            {isWriteAllowed && (
-              <button
-                onClick={() => setCreateModalOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        <PageHeader 
+          icon={LayoutDashboard}
+          title="Panneaux (Kanban)"
+          description="Suivi de production MES et assemblage"
+          action={
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={fetchAll}
+                className="p-2.5 text-secondary-foreground hover:text-primary hover:bg-secondary rounded-lg transition-colors border border-transparent"
+                title="Rafraîchir"
               >
-                <Plus className="h-4 w-4" />
-                <span>Nouveau Panneau</span>
+                <RefreshCw className="w-5 h-5" />
               </button>
-            )}
-          </div>
-        </div>
+              
+              {isWriteAllowed && (
+                <button
+                  onClick={() => setCreateModalOpen(true)}
+                  className="bg-primary hover:bg-primary-hover active:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-md hover:shadow focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Nouveau Panneau</span>
+                </button>
+              )}
+            </div>
+          }
+        />
 
         {/* Global Error Banner */}
         {error && (
@@ -320,6 +313,7 @@ export default function PanneauxPage() {
           boms={boms}
           entrepots={entrepots}
           supervisors={supervisors}
+          planifications={planifications}
         />
 
         <EditPanneauModal 
@@ -330,6 +324,7 @@ export default function PanneauxPage() {
           boms={boms}
           entrepots={entrepots}
           supervisors={supervisors}
+          planifications={planifications}
         />
 
         <DetailPanneauModal 

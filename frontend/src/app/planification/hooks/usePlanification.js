@@ -2,88 +2,192 @@ import { useState, useCallback } from 'react';
 import API from '../../../lib/api';
 
 export function usePlanification() {
-  const [dashboardStats, setDashboardStats] = useState(null);
-  const [planifications, setPlanifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const loadDashboard = useCallback(async (showLoading = true) => {
+  // Read
+  const loadPlanifications = useCallback(async (filters = {}) => {
+    setLoading(true);
+    setError(null);
     try {
-      if (showLoading) setLoading(true);
-      setError('');
-      const [dashRes, planRes] = await Promise.all([
-        API.get('/planifications/dashboard'),
-        API.get('/planifications')
-      ]);
-      setDashboardStats(dashRes.data);
-      setPlanifications(planRes.data);
+      // Build query string from filters
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value);
+        }
+      });
+      
+      const res = await API.get(`/planifications?${params.toString()}`);
+      // Assuming the backend returns { data, meta }
+      return res.data;
     } catch (err) {
-      console.error(err);
-      setError('Impossible de charger les données de planification.');
+      setError(err.response?.data?.error || "Erreur de chargement des planifications");
+      throw err;
     } finally {
-      if (showLoading) setLoading(false);
+      setLoading(false);
     }
   }, []);
 
-  const createPlanification = async (data) => {
+  const getPlanificationById = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
     try {
-      await API.post('/planifications', data);
-      await loadDashboard(false);
-      return { success: true };
+      const res = await API.get(`/planifications/${id}`);
+      return res.data;
     } catch (err) {
-      return { success: false, error: err?.response?.data?.error || 'Erreur de création' };
+      setError(err.response?.data?.error || "Erreur de chargement de la planification");
+      throw err;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const updatePlanification = async (id, data) => {
+  const loadDashboardStats = useCallback(async () => {
     try {
-      await API.put(`/planifications/${id}`, data);
-      await loadDashboard(false);
-      return { success: true };
+      const res = await API.get('/planifications/dashboard');
+      return res.data;
     } catch (err) {
-      return { success: false, error: err?.response?.data?.error || 'Erreur de modification' };
+      console.error('Erreur chargement stats dashboard', err);
+      return null;
     }
-  };
+  }, []);
 
-  const updateStatus = async (id, status, notes) => {
-    try {
-      await API.patch(`/planifications/${id}/status`, { status, notes });
-      await loadDashboard(false);
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err?.response?.data?.error || 'Erreur de mise à jour du statut' };
-    }
-  };
-
-  const deletePlanification = async (id) => {
-    try {
-      await API.delete(`/planifications/${id}`);
-      await loadDashboard(false);
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err?.response?.data?.error || 'Erreur de suppression' };
-    }
-  };
-
-  const getHistory = async (id) => {
+  const getHistory = useCallback(async (id) => {
     try {
       const res = await API.get(`/planifications/${id}/history`);
-      return { success: true, data: res.data };
+      return res.data;
     } catch (err) {
-      return { success: false, error: 'Erreur lors du chargement de l\'historique' };
+      console.error('Erreur chargement historique', err);
+      return [];
     }
-  };
+  }, []);
+
+  // Write
+  const createPlanification = useCallback(async (data) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await API.post('/planifications', data);
+      return res.data;
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur de création");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const updatePlanification = useCallback(async (id, data) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await API.put(`/planifications/${id}`, data);
+      return res.data;
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur de mise à jour");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Transitions
+  const planifier = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await API.post(`/planifications/${id}/planifier`);
+      return res.data;
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur lors de la planification");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const startProduction = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await API.post(`/planifications/${id}/start`);
+      return res.data;
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur lors du lancement de la production");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const cancelPlanification = useCallback(async (id, reason) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await API.post(`/planifications/${id}/cancel`, { reason });
+      return res.data;
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur lors de l'annulation");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const deletePlanification = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await API.delete(`/planifications/${id}`);
+      return true;
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur de suppression");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Options fetching
+  const loadBoms = useCallback(async () => {
+    try {
+      const res = await API.get('/bom');
+      return res.data;
+    } catch (err) {
+      console.error('Erreur chargement BOMs', err);
+      return [];
+    }
+  }, []);
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const res = await API.get('/users/team');
+      const allUsers = res.data || [];
+      return {
+        gls: allUsers.filter(u => u.role === 'GL'),
+        superviseurs: allUsers.filter(u => u.role === 'SUPERVISEUR')
+      };
+    } catch (err) {
+      console.error('Erreur chargement utilisateurs', err);
+      return { gls: [], superviseurs: [] };
+    }
+  }, []);
 
   return {
-    dashboardStats,
-    planifications,
     loading,
     error,
-    loadDashboard,
+    loadPlanifications,
+    getPlanificationById,
+    loadDashboardStats,
+    getHistory,
     createPlanification,
     updatePlanification,
-    updateStatus,
+    planifier,
+    startProduction,
+    cancelPlanification,
     deletePlanification,
-    getHistory,
+    loadBoms,
+    loadUsers
   };
 }

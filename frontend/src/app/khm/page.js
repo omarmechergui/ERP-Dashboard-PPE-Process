@@ -10,6 +10,9 @@ import KhmFilters from "./components/KhmFilters";
 import KhmCard from "./components/KhmCard";
 import RejectModal from "./components/RejectModal";
 import HistoryModal from "./components/HistoryModal";
+import PageHeader from "../../components/ui/PageHeader";
+import LoadingState from "../../components/ui/LoadingSkeleton";
+import EmptyState from "../../components/ui/EmptyState";
 
 export default function KhmPage() {
   const { user } = useAuth();
@@ -95,38 +98,28 @@ export default function KhmPage() {
   };
 
   if (loading && !controls.length) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
-        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-        <p className="text-sm font-medium text-slate-500 tracking-wide">Chargement du contrôle qualité (KHM)...</p>
-      </div>
-    );
+    return <LoadingState type="dashboard" />;
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-              <ShieldCheck className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Contrôle Qualité KHM</h1>
-              <p className="text-sm text-slate-500 mt-0.5">Validation électrique et visuelle finale des panneaux</p>
-            </div>
-          </div>
-
-          <button 
-            onClick={() => { syncKhm(); }}
-            className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100 self-start md:self-auto"
-            title="Rafraîchir et synchroniser"
-          >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+        <PageHeader 
+          icon={ShieldCheck}
+          title="Contrôle Qualité KHM"
+          description="Validation électrique et visuelle finale des panneaux"
+          action={
+            <button 
+              onClick={() => { syncKhm(); }}
+              className="p-2.5 text-secondary-foreground hover:text-primary hover:bg-secondary rounded-lg transition-colors border border-transparent"
+              title="Rafraîchir et synchroniser"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          }
+        />
 
         {/* Global Error Banner */}
         {error && (
@@ -166,9 +159,12 @@ export default function KhmPage() {
               />
             ))
           ) : (
-            <div className="col-span-full bg-white border border-slate-200 text-slate-500 text-center p-12 rounded-2xl flex flex-col items-center justify-center shadow-sm">
-              <ShieldCheck className="w-12 h-12 text-slate-300 mb-3" />
-              <p className="font-medium">Aucun contrôle KHM ne correspond à vos critères.</p>
+            <div className="col-span-full">
+              <EmptyState 
+                icon={ShieldCheck}
+                title="Aucun contrôle trouvé"
+                message="Aucun contrôle KHM ne correspond à vos critères."
+              />
             </div>
           )}
         </div>

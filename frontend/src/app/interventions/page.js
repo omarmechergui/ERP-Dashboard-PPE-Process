@@ -9,8 +9,9 @@ import InterventionTable from "./components/InterventionTable";
 import InterventionTimeline from "./components/timeline/InterventionTimeline";
 import InterventionModal from "./components/modal/InterventionModal";
 import InterventionDetailModal from "./components/modal/InterventionDetailModal";
-import LoadingState from "./components/common/LoadingState";
-import ErrorState from "./components/common/ErrorState";
+import LoadingState from "../../components/ui/LoadingSkeleton";
+import ErrorState from "../../components/ui/ErrorState";
+import PageHeader from "../../components/ui/PageHeader";
 
 export default function InterventionsPage() {
   const {
@@ -98,29 +99,24 @@ export default function InterventionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6 lg:p-8">
-      <div className="max-w-[1400px] mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8 animate-fade-in">
+      <div className="max-w-[1600px] mx-auto space-y-8">
         
         {/* Header section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-              <Settings className="w-8 h-8 text-blue-600" />
-              Interventions de Maintenance
-            </h1>
-            <p className="text-sm text-gray-500 mt-1 font-medium">
-              Gérez vos activités de maintenance préventive et corrective
-            </p>
-          </div>
-          
-          <button
-            onClick={() => handleOpenModal()}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" />
-            Nouvelle intervention
-          </button>
-        </div>
+        <PageHeader 
+          icon={Settings}
+          title="Interventions de Maintenance"
+          description="Gérez vos activités de maintenance préventive et corrective"
+          action={
+            <button
+              onClick={() => handleOpenModal()}
+              className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-primary-foreground px-6 py-3 rounded-xl text-sm font-bold transition-all shadow-md hover:-translate-y-0.5 whitespace-nowrap"
+            >
+              <Plus className="w-5 h-5" />
+              Nouvelle intervention
+            </button>
+          }
+        />
 
         {/* Dashboard KPIs */}
         <InterventionKPIs stats={stats} />

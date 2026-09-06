@@ -99,7 +99,7 @@ const menuGroups = [
         // badge: 3,
       },
       {
-        name: "Commande",
+        name: "Reception",
         path: "/commande",
         icon: ShoppingCart,
         roles: ["ADMIN"],
@@ -235,12 +235,12 @@ function SidebarItem({ item, isActive, isCollapsed, onNavigate }) {
       {/* Tooltip (collapsed state only) */}
       {isCollapsed && (
         <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 opacity-0 invisible group-hover/item:opacity-100 group-hover/item:visible transition-all duration-150">
-          <div className="relative px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg shadow-lg whitespace-nowrap">
+          <div className="relative px-3 py-1.5 bg-card text-foreground border border-border text-xs font-medium rounded-lg shadow-md whitespace-nowrap">
             {item.name}
             {item.badge != null && item.badge > 0 && (
-              <span className="ml-2 text-rose-300">{item.badge}</span>
+              <span className="ml-2 text-primary">{item.badge}</span>
             )}
-            <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-white rotate-45 " />
+            <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-card border-l border-b border-border rotate-45 " />
           </div>
         </div>
       )}
@@ -336,17 +336,17 @@ function UserProfile({ user, isCollapsed, onLogout }) {
         {/* Collapsed tooltip */}
         {isCollapsed && (
           <div className="pointer-events-auto absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-150">
-            <div className="relative px-3 py-2 bg-white text-white text-xs font-medium rounded-lg shadow-lg whitespace-nowrap  space-y-1">
+            <div className="relative px-3 py-2 bg-card text-foreground border border-border text-xs font-medium rounded-lg shadow-md whitespace-nowrap space-y-1">
               <p className="font-semibold">{displayName}</p>
-              <p className="text-slate-600 text-[10px]">{displayRole}</p>
+              <p className="text-secondary-foreground text-[10px]">{displayRole}</p>
               <button
                 onClick={onLogout}
-                className="mt-1 flex items-center gap-1.5 text-rose-300 hover:text-rose-100 transition-colors"
+                className="mt-1 flex items-center gap-1.5 text-danger hover:text-danger/80 transition-colors"
               >
                 <LogOut className="h-3 w-3" />
                 Déconnexion
               </button>
-              <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-white rotate-45 " />
+              <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-card border-l border-b border-border rotate-45 " />
             </div>
           </div>
         )}
@@ -563,31 +563,6 @@ border-r border-slate-200/80
           .sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
             background: #e2e8f0;
           }
-         .sidebar-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-.sidebar-scrollbar:hover {
-  scrollbar-color: #cbd5e1 transparent;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 4px;
-}
-
-.sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-}
         `,
         }}
       />

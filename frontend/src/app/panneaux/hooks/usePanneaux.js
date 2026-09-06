@@ -12,6 +12,7 @@ export function usePanneaux() {
   const [boms, setBoms] = useState([]);
   const [entrepots, setEntrepots] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
+  const [planifications, setPlanifications] = useState([]);
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,16 +21,18 @@ export function usePanneaux() {
     try {
       setLoading(true);
       setError(null);
-      const [panRes, bomRes, entRes, userRes] = await Promise.all([
+      const [panRes, bomRes, entRes, userRes, planRes] = await Promise.all([
         API.get('/panneaux'),
         API.get('/bom'),
         API.get('/entrepots'),
-        API.get('/users').catch(() => ({ data: [] }))
+        API.get('/users').catch(() => ({ data: [] })),
+        API.get('/planifications').catch(() => ({ data: [] }))
       ]);
 
       setPanneaux(panRes.data || []);
       setBoms(bomRes.data || []);
       setEntrepots(entRes.data || []);
+      setPlanifications(planRes.data?.data || (Array.isArray(planRes.data) ? planRes.data : []));
 
       let sups = [];
       if (userRes.data && userRes.data.length > 0) {
@@ -112,6 +115,7 @@ export function usePanneaux() {
     boms,
     entrepots,
     supervisors,
+    planifications,
     loading,
     error,
     fetchAll,

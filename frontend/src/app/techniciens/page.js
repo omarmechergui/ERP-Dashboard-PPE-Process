@@ -11,7 +11,10 @@ import SkillMatrix from './components/SkillMatrix';
 import TechnicianDrawer from './components/TechnicianDrawer';
 import TechnicianCard from './components/TechnicianCard';
 import NewTechnicianModal from './components/NewTechnicianModal';
-import { Plus, LayoutGrid, Table } from 'lucide-react';
+import { Plus, LayoutGrid, Table, User } from 'lucide-react';
+import LoadingState from '../../components/ui/LoadingSkeleton';
+import ErrorState from '../../components/ui/ErrorState';
+import PageHeader from '../../components/ui/PageHeader';
 
 export default function TechniciensPage() {
   const { user } = useAuth();
@@ -140,62 +143,53 @@ export default function TechniciensPage() {
   // Loading state
   if (loading) return (
     <div className="w-full p-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse h-24" />
-        ))}
-      </div>
-      <div className="bg-white rounded-xl border border-slate-200 p-8 animate-pulse h-64" />
+      <LoadingState type="dashboard" />
     </div>
   );
 
   // Error state
   if (error) return (
     <div className="w-full p-6">
-      <div className="bg-rose-50 border border-rose-200 text-rose-600 p-6 rounded-xl text-center">
-        <p className="font-medium">{error}</p>
-        <button onClick={() => window.location.reload()} className="mt-3 px-4 py-1.5 bg-rose-100 hover:bg-rose-200 rounded-lg text-sm transition-colors">
-          Retry
-        </button>
-      </div>
+      <ErrorState error={error} onRetry={() => window.location.reload()} />
     </div>
   );
 
   return (
-    <div className="w-full min-h-screen bg-slate-50/50 p-4 md:p-6 font-sans">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md -mx-4 md:-mx-6 px-4 md:px-6 py-3 mb-4 border-b border-slate-200/60">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">Gestion des Techniciens</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Suivi des interventions, compétences et maintenance préventive</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex bg-slate-200/60 p-1 rounded-lg">
+    <div className="w-full min-h-screen bg-background p-4 md:p-6 font-sans animate-fade-in">
+      {/* Header */}
+      <div className="mb-6">
+        <PageHeader 
+          icon={User}
+          title="Gestion des Techniciens"
+          description="Suivi des interventions, compétences et maintenance préventive"
+          action={
+            <div className="flex items-center gap-3">
+              <div className="flex bg-secondary/50 p-1 rounded-xl border border-border">
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg flex items-center justify-center transition-all duration-300 ${viewMode === 'grid' ? 'bg-card shadow-sm text-primary font-bold' : 'text-secondary-foreground hover:text-foreground hover:bg-secondary'}`}
+                  title="Vue Cartes"
+                >
+                  <LayoutGrid size={18} />
+                </button>
+                <button 
+                  onClick={() => setViewMode('matrix')}
+                  className={`p-2 rounded-lg flex items-center justify-center transition-all duration-300 ${viewMode === 'matrix' ? 'bg-card shadow-sm text-primary font-bold' : 'text-secondary-foreground hover:text-foreground hover:bg-secondary'}`}
+                  title="Matrice Compétences"
+                >
+                  <Table size={18} />
+                </button>
+              </div>
               <button 
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                title="Vue Cartes"
+                onClick={() => setIsModalOpen(true)}
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-md hover:-translate-y-0.5 hover:bg-primary-hover transition-all flex items-center gap-2 whitespace-nowrap"
               >
-                <LayoutGrid size={18} />
-              </button>
-              <button 
-                onClick={() => setViewMode('matrix')}
-                className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'matrix' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                title="Matrice des Compétences"
-              >
-                <Table size={18} />
+                <Plus size={18} />
+                <span>Nouveau</span>
               </button>
             </div>
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-            >
-              <Plus size={16} />
-              Nouveau Technicien
-            </button>
-          </div>
-        </div>
+          }
+        />
       </div>
 
       {/* KPIs */}

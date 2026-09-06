@@ -3,32 +3,32 @@ import { ArrowDownRight, ArrowUpLeft, Download, RefreshCw, UploadCloud } from "l
 
 export const Header = ({ isMoveAllowed, onRefresh, onNewEntry, onNewExit, onImport, lastSync }) => {
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-6 rounded-2xl shadow-sm border border-border mb-6">
       <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Stock Movements</h1>
-        <div className="flex items-center gap-2 mt-1">
-          <p className="text-sm text-slate-500">
-            Audit and track all inventory transactions
-          </p>
-          <span className="text-slate-300">•</span>
-          <span className="text-xs text-slate-400 flex items-center gap-1">
+        <h1 className="text-3xl font-extrabold text-foreground tracking-tight flex items-center gap-3">
+          Mouvements de Stock
+        </h1>
+        <p className="text-sm text-secondary-foreground mt-2 font-medium flex items-center gap-2">
+          Suivi et audit des transactions d&apos;inventaire
+          <span className="text-border">•</span>
+          <span className="flex items-center gap-1 text-xs">
             <RefreshCw className="h-3 w-3" />
-            Synced: {lastSync || "Just now"}
+            Synchro: {lastSync || "À l'instant"}
           </span>
-        </div>
+        </p>
       </div>
 
       <div className="flex items-center gap-3">
         <button
           onClick={onRefresh}
-          className="p-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors border border-transparent hover:border-slate-200"
-          title="Refresh Data"
+          className="p-2.5 text-secondary-foreground hover:text-primary hover:bg-secondary rounded-xl transition-colors border border-transparent"
+          title="Actualiser"
         >
           <RefreshCw className="h-5 w-5" />
         </button>
         <button
-          className="p-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors border border-transparent hover:border-slate-200"
-          title="Export Report"
+          className="p-2.5 text-secondary-foreground hover:text-primary hover:bg-secondary rounded-xl transition-colors border border-transparent"
+          title="Exporter"
         >
           <Download className="h-5 w-5" />
         </button>
@@ -37,24 +37,24 @@ export const Header = ({ isMoveAllowed, onRefresh, onNewEntry, onNewExit, onImpo
           <div className="flex gap-2">
             <button
               onClick={onImport}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+              className="bg-secondary/50 border border-border hover:bg-secondary text-foreground px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm"
             >
               <UploadCloud className="h-4 w-4" />
-              <span>Import Excel</span>
+              <span className="hidden sm:inline">Import</span>
             </button>
             <button
               onClick={onNewEntry}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+              className="bg-success/10 border border-success/30 hover:bg-success/20 text-success px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm"
             >
               <ArrowDownRight className="h-4 w-4" />
-              <span>Receive Stock</span>
+              <span>Entrée</span>
             </button>
             <button
               onClick={onNewExit}
-              className="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-lg shadow-rose-500/20 active:scale-95"
+              className="bg-danger/10 border border-danger/30 hover:bg-danger/20 text-danger px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm"
             >
               <ArrowUpLeft className="h-4 w-4" />
-              <span>Issue Stock</span>
+              <span>Sortie</span>
             </button>
           </div>
         )}

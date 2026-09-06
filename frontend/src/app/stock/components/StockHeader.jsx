@@ -4,26 +4,26 @@ import ExportMenu from "./export/ExportMenu";
 
 export const StockHeader = ({ isWriteAllowed, onAddArticle, onRefresh, onImport, lastSync, data, userRole, filters }) => {
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-6 rounded-2xl shadow-sm border border-border mb-6">
       <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Stock & Inventory</h1>
-        <div className="flex items-center gap-2 mt-1">
-          <p className="text-sm text-slate-500">
-            Enterprise Materials Management
-          </p>
-          <span className="text-slate-300">•</span>
-          <span className="text-xs text-slate-400 flex items-center gap-1">
+        <h1 className="text-3xl font-extrabold text-foreground tracking-tight flex items-center gap-3">
+          Stock & Inventaire
+        </h1>
+        <p className="text-sm text-secondary-foreground mt-2 font-medium flex items-center gap-2">
+          Gestion des matières premières et consommables
+          <span className="text-border">•</span>
+          <span className="flex items-center gap-1 text-xs">
             <RefreshCw className="h-3 w-3" />
-            Last synced: {lastSync || "Just now"}
+            Dernière synchro: {lastSync || "À l'instant"}
           </span>
-        </div>
+        </p>
       </div>
 
       <div className="flex items-center gap-3">
         <button
           onClick={onRefresh}
-          className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors border border-transparent hover:border-slate-200"
-          title="Refresh Data"
+          className="p-2.5 text-secondary-foreground hover:text-primary hover:bg-secondary rounded-lg transition-colors border border-transparent"
+          title="Actualiser les données"
         >
           <RefreshCw className="h-5 w-5" />
         </button>
@@ -33,17 +33,17 @@ export const StockHeader = ({ isWriteAllowed, onAddArticle, onRefresh, onImport,
           <div className="flex gap-2">
             <button
               onClick={onImport}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95"
+              className="bg-secondary/50 border border-border hover:bg-secondary text-foreground px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm"
             >
               <UploadCloud className="h-4 w-4" />
-              <span>Import Excel</span>
+              <span className="hidden sm:inline">Import Excel</span>
             </button>
             <button
               onClick={onAddArticle}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-md shadow-emerald-500/20 active:scale-95"
+              className="bg-primary hover:bg-primary-hover text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md hover:-translate-y-0.5"
             >
               <Plus className="h-4 w-4" />
-              <span>Quick Add Article</span>
+              <span>Nouveau Article</span>
             </button>
           </div>
         )}

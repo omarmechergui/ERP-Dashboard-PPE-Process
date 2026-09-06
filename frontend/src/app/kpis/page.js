@@ -37,13 +37,13 @@ export default function KpisPage() {
   if (loading) return <SkeletonDashboard />;
   
   if (error) return (
-    <div className="w-full min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="bg-rose-50 border border-rose-200 p-8 rounded-2xl flex flex-col items-center gap-4 shadow-sm max-w-md text-center">
-        <h3 className="text-rose-800 font-bold text-xl mb-1">Erreur de chargement</h3>
-        <p className="text-rose-600 mb-4">{error}</p>
+    <div className="w-full min-h-screen bg-background flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-danger/10 border border-danger/20 p-8 rounded-2xl flex flex-col items-center gap-4 shadow-sm max-w-md text-center">
+        <h3 className="text-danger font-extrabold text-2xl mb-1">Erreur de chargement</h3>
+        <p className="text-danger/80 font-medium mb-4">{error}</p>
         <button
           onClick={refreshData}
-          className="px-6 py-2.5 bg-white text-rose-700 text-sm font-bold border border-rose-200 rounded-xl hover:bg-rose-100 transition-colors shadow-sm"
+          className="px-6 py-2.5 bg-card text-danger text-sm font-bold border border-danger/20 rounded-xl hover:bg-danger/10 transition-colors shadow-sm hover:scale-105"
         >
           Réessayer
         </button>
@@ -54,7 +54,7 @@ export default function KpisPage() {
   if (!data) return <EmptyState onRefresh={refreshData} />;
 
   return (
-    <div className="w-full min-h-screen bg-slate-50">
+    <div className="w-full min-h-screen bg-background animate-fade-in">
       <div className="max-w-[1600px] mx-auto p-4 md:p-8">
         
         <DashboardHeader

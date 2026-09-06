@@ -10,7 +10,8 @@ import PreventiveTable from './components/PreventiveTable';
 import PreventiveModal from './components/PreventiveModal';
 import PreventiveDetailModal from './components/PreventiveDetailModal';
 import PreventiveImportWizard from './components/PreventiveImportWizard';
-import LoadingState from '../interventions/components/common/LoadingState';
+import LoadingState from '../../components/ui/LoadingSkeleton';
+import PageHeader from '../../components/ui/PageHeader';
 
 import { Plus, Download, Upload, Loader2, Calendar } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
@@ -72,45 +73,38 @@ export default function PreventivePage() {
   if (loading && !data.length) return <LoadingState />;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-      <div className="max-w-[1600px] mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-4 md:p-8 animate-fade-in">
+      <div className="max-w-[1600px] mx-auto space-y-8">
         
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-              <span className="p-2 bg-indigo-100 rounded-xl text-indigo-600">
-                <Calendar className="w-6 h-6" />
-              </span>
-              Maintenance Préventive
-            </h1>
-            <p className="text-slate-500 mt-1">Gérez la planification et le suivi des entretiens réguliers.</p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {canEdit && (
-                <>
-                    <button 
-                      onClick={() => setIsImportWizardOpen(true)}
-                      className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
-                    >
-                      <Upload className="w-4 h-4" /> Import Excel
-                    </button>
-                    <button 
-                      onClick={handleOpenCreate}
-                      className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-600/20 flex items-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" /> Nouveau Plan
-                    </button>
-                </>
-            )}
-          </div>
-        </div>
+        <PageHeader 
+          icon={Calendar}
+          title="Maintenance Préventive"
+          description="Gérez la planification et le suivi des entretiens réguliers."
+          action={
+            canEdit && (
+              <>
+                <button 
+                  onClick={() => setIsImportWizardOpen(true)}
+                  className="px-5 py-2.5 bg-card border border-border text-foreground rounded-xl text-sm font-bold hover:bg-secondary transition-colors shadow-sm flex items-center gap-2"
+                >
+                  <Upload className="w-5 h-5" /> Import Excel
+                </button>
+                <button 
+                  onClick={handleOpenCreate}
+                  className="px-5 py-2.5 bg-primary text-primary-foreground hover:bg-primary-hover rounded-xl text-sm font-bold shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-2"
+                >
+                  <Plus className="w-5 h-5" /> Créer un Plan
+                </button>
+              </>
+            )
+          }
+        />
 
         {/* Error State */}
         {error && (
-          <div className="bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-xl">
-            <p className="text-rose-700">{error}</p>
+          <div className="bg-danger/10 border-l-4 border-danger p-4 rounded-r-xl">
+            <p className="text-danger font-bold">{error}</p>
           </div>
         )}
 

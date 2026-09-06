@@ -470,6 +470,28 @@ const changeInterventionStatus = async (req, res, next) => {
     const interventionId = req.params.id;
 
     const existing = await prisma.intervention.findUnique({ where: { id: interventionId } });
+    
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Intervention introuvable' });
+    }
+
+    // Status transition enforcement
+    const currentStatus = existing.status;
+    const validTransitions = {
+       'PLANIFIÉE': ['EN_COURS', 'ANNULÉE', 'En cours', 'Annulée'],
+       'En attente': ['EN_COURS', 'ANNULÉE', 'En cours', 'Annulée'],
+       'EN_COURS': ['TERMINÉE', 'En attente', 'Clôturée', 'ANNULÉE'],
+       'En cours': ['TERMINÉE', 'En attente', 'Clôturée', 'ANNULÉE'],
+       'TERMINÉE': [],
+       'Clôturée': [],
+       'ANNULÉE': [],
+       'Annulée': []
+    };
+
+    if (currentStatus !== status && validTransitions[currentStatus] && !validTransitions[currentStatus].includes(status)) {
+       return res.status(400).json({ success: false, error: `Transition invalide: impossible de passer de ${currentStatus} à ${status}` });
+    }
+
     const dataToUpdate = { status };
 
     if ((status === 'Clôturée' || status === 'TERMINÉE') && existing?.downtime == null) {

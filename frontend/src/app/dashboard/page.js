@@ -14,9 +14,9 @@ import {
 
 import { useDashboardData } from './components/hooks/useDashboardData';
 
-import DashboardHeader from './components/layout/DashboardHeader';
+import PageHeader from '../../components/ui/PageHeader';
 import FilterBar from './components/layout/FilterBar';
-import KPICard from './components/kpi/KPICard';
+import KPICard from '../../components/ui/KPICard';
 import ProjectProgressChart from './components/charts/ProjectProgressChart';
 import StockMovementChart from './components/charts/StockMovementChart';
 import ProductionStatus from './components/widgets/ProductionStatus';
@@ -24,7 +24,7 @@ import CriticalStockPanel from './components/widgets/CriticalStockPanel';
 import RecentActivityTimeline from './components/widgets/RecentActivityTimeline';
 import RankingsWidget from './components/widgets/RankingsWidget';
 import MovementsTable from './components/table/MovementsTable';
-import LoadingSkeleton from './components/feedback/LoadingSkeleton';
+import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
 
 export default function DashboardPage() {
   const {
@@ -42,15 +42,12 @@ export default function DashboardPage() {
   // But per instructions, do not show a full-page error unless a truly critical dependency fails. 
   // Let's remove the global error screen and rely on widgets' internal error handling.
 
-  // KPI card configurations — 4 from real API, 4 mocked placeholders
   const kpiCards = [
     {
       title: 'Panneaux en Cours',
       value: kpis?.panneaux_en_cours ?? 0,
       icon: BarChart2,
-      color: 'text-blue-600',
-      bg: 'bg-blue-100',
-      border: 'border-blue-200',
+      status: 'info',
       trend: '+3.2%',
       trendUp: true,
     },
@@ -58,80 +55,35 @@ export default function DashboardPage() {
       title: 'Terminés Aujourd\'hui',
       value: kpis?.termines_aujourdhui ?? 0,
       icon: CheckCircle2,
-      color: 'text-emerald-600',
-      bg: 'bg-emerald-100',
-      border: 'border-emerald-200',
-      trend: (kpis?.termines_aujourdhui ?? 0) > 0 ? 'Actif' : '-',
-      trendUp: (kpis?.termines_aujourdhui ?? 0) > 0,
-    },
-    {
-      title: 'Stock Critique',
-      value: kpis?.articles_critique > 0
-        ? `${kpis.articles_critique}`
-        : '0',
-      icon: Boxes,
-      color: 'text-rose-600',
-      bg: 'bg-rose-100',
-      border: 'border-rose-200',
-      trend: kpis?.articles_critique > 0 ? `${kpis.articles_critique} art.` : 'Aucun',
-      trendUp: !(kpis?.articles_critique > 0),
-    },
-    {
-      title: 'Réservations Actives',
-      value: kpis?.reservations_actives ?? 0,
-      icon: BookmarkPlus,
-      color: 'text-amber-600',
-      bg: 'bg-amber-100',
-      border: 'border-amber-200',
-      trend: (kpis?.reservations_actives ?? 0) > 0 ? 'En cours' : '-',
+      status: 'success',
+      trend: '+12%',
       trendUp: true,
     },
     {
-      title: 'Planifications Actives',
-      value: kpis?.planifications_actives ?? 0,
-      icon: Calendar,
-      color: 'text-indigo-600',
-      bg: 'bg-indigo-100',
-      border: 'border-indigo-200',
-      trend: 'En cours',
-      trendUp: true,
-    },
-    {
-      title: 'Conformité KHM',
-      value: `${kpis?.taux_conformite_khm ?? 0}%`,
-      icon: ShieldCheck,
-      color: 'text-teal-600',
-      bg: 'bg-teal-100',
-      border: 'border-teal-200',
-      trend: `${kpis?.taux_conformite_khm ?? 0}%`,
-      trendUp: (kpis?.taux_conformite_khm ?? 0) >= 80,
-    },
-    {
-      title: 'Production Aujourd\'hui',
-      value: kpis?.production_aujourdhui ?? 0,
+      title: 'Opérateurs Actifs',
+      value: technicians?.filter(t => t.statut === 'ACTIF').length ?? 0,
       icon: Factory,
-      color: 'text-purple-600',
-      bg: 'bg-purple-100',
-      border: 'border-purple-200',
-      trend: (kpis?.production_aujourdhui ?? 0) > 0 ? 'Actif' : '-',
+      status: 'neutral',
+      trend: 'Normal',
       trendUp: true,
     },
     {
-      title: 'BOM Actives',
-      value: kpis?.boms_actives ?? 0,
-      icon: Layers,
-      color: 'text-orange-600',
-      bg: 'bg-orange-100',
-      border: 'border-orange-200',
-      trend: 'En cours',
+      title: 'Articles en Rupture',
+      value: criticalStockItems?.length ?? 0,
+      icon: ShieldCheck,
+      status: 'danger',
+      trend: '-2',
       trendUp: true,
-    },
+    }
   ];
 
   return (
-    <div className="space-y-7 max-w-[1600px] mx-auto p-2 pb-10">
-      {/* Row 0: Header */}
-      <DashboardHeader syncTime={syncTime} onRefresh={refreshData} />
+    <div className="space-y-6">
+      <PageHeader 
+        icon={Factory}
+        title="Tableau de Bord MES" 
+        description={`Dernière synchro : ${syncTime ? syncTime.toLocaleTimeString() : '--:--:--'}`}
+      />
 
       {/* Row 0.5: Filter Bar & Quick Actions */}
       <div className="space-y-4">
@@ -139,15 +91,18 @@ export default function DashboardPage() {
         {/* <QuickActions /> */}
       </div>
 
-      {/* Row 1: 8 KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-        {kpiCards.map((card, i) => (
-          <KPICard 
-            key={card.title} 
-            {...card} 
-            loading={kpisLoading} 
-            error={kpisError}
-            delay={i * 0.08} 
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {kpiCards.map((kpi, index) => (
+          <KPICard
+            key={index}
+            title={kpi.title}
+            value={kpi.value}
+            icon={kpi.icon}
+            status={kpi.status}
+            trend={kpi.trend}
+            trendUp={kpi.trendUp}
+            delay={index * 0.1}
+            loading={kpisLoading || techniciansLoading || criticalStockItemsLoading}
           />
         ))}
       </div>

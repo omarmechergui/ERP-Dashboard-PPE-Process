@@ -1,14 +1,16 @@
 const express = require('express');
 const {
-  getDashboardStats,
   getPlanifications,
   getPlanificationById,
-  getPlanificationPanneaux,
-  getPlanificationHistory,
   createPlanification,
   updatePlanification,
-  updatePlanificationStatus,
+  planifierPlanification,
+  startProduction,
+  cancelPlanification,
   deletePlanification,
+  getPlanificationHistory,
+  getDashboardStats,
+  getPlanificationPanneaux
 } = require('../controllers/planificationController');
 const { protect } = require('../middlewares/auth');
 const requireRole = require('../middlewares/role');
@@ -17,19 +19,25 @@ const router = express.Router();
 
 router.use(protect);
 
-// Dashboard stats
+// Dashboard routes
 router.get('/dashboard', getDashboardStats);
 
-// Planification Reading (All roles)
+// Read routes
 router.get('/', getPlanifications);
 router.get('/:id', getPlanificationById);
 router.get('/:id/panneaux', getPlanificationPanneaux);
 router.get('/:id/history', getPlanificationHistory);
 
-// Planification Mutations (GL & Admin)
+// Write routes
 router.post('/', requireRole(['GL', 'ADMIN']), createPlanification);
 router.put('/:id', requireRole(['GL', 'ADMIN']), updatePlanification);
-router.patch('/:id/status', requireRole(['GL', 'ADMIN', 'SUPERVISEUR']), updatePlanificationStatus);
+
+// Transition routes
+router.post('/:id/planifier', requireRole(['GL', 'ADMIN']), planifierPlanification);
+router.post('/:id/start', requireRole(['GL', 'ADMIN']), startProduction);
+router.post('/:id/cancel', requireRole(['GL', 'ADMIN', 'SUPERVISEUR']), cancelPlanification);
+
+// Delete route
 router.delete('/:id', requireRole(['GL', 'ADMIN']), deletePlanification);
 
 module.exports = router;

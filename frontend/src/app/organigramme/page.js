@@ -81,14 +81,14 @@ export default function OrganigrammePage() {
 
   if (loading && (!treeData || treeData.length === 0)) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-background">
         <LoadingSkeleton />
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen bg-slate-50 transition-all ${isFullscreen ? 'p-0' : 'p-4 md:p-6 lg:p-8'}`}>
+    <div className={`min-h-screen bg-background transition-all ${isFullscreen ? 'p-0' : 'p-4 md:p-6 lg:p-8'}`}>
       
       {/* Action Feedback Alert */}
       {alert && (
@@ -116,10 +116,10 @@ export default function OrganigrammePage() {
             />
             
             {/* Workflow Banner */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 border-b border-gray-200 bg-gray-50/50">
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 border-b border-border bg-secondary/30">
                 <div className="flex items-center gap-4">
-                  <h2 className="text-lg font-bold text-gray-900">
+                  <h2 className="text-lg font-bold text-foreground">
                     {currentOrg ? currentOrg.titre : "Organigramme"}
                   </h2>
                   {currentOrg && <WorkflowStatusBadge status={currentOrg.statut} />}
@@ -128,7 +128,7 @@ export default function OrganigrammePage() {
                 <div className="flex items-center gap-3 mt-4 md:mt-0">
                   <button
                     onClick={() => setShowList(!showList)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-secondary-foreground bg-card border border-border rounded-lg hover:bg-secondary transition-colors"
                   >
                     {showList ? <Layout className="w-4 h-4" /> : <List className="w-4 h-4" />}
                     {showList ? "Vue Principale" : "Liste des Versions"}
@@ -137,7 +137,7 @@ export default function OrganigrammePage() {
                   {currentOrg && (
                     <button
                       onClick={() => setShowHistory(!showHistory)}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100"
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
                     >
                       Historique
                       {showHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}

@@ -30,6 +30,7 @@ model User {
   reported_scraps           PanneauScrap[]
   panel_history             PanneauHistory[]
   planification_history     PlanificationHistory[]
+  completed_planification_checks PlanificationActionChecklist[]
 
   // Organigramme relations
   organigrammes        Organigramme[]        @relation("OrganigrammeCreator")
@@ -121,6 +122,7 @@ model BOM {
   clip         String
   lignes       BomLigne[]
   panneaux     Panneau[]
+  planifications Planification[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -150,23 +152,30 @@ model Entrepot {
 
 model Planification {
   id String @id @default(auto()) @map("_id") @db.ObjectId
+  reference             String   @unique
   title                 String
   project               String?
   customer              String?
+  description           String?
   priority              String   @default("NORMAL")
+  quantite              Int?
+  production_mode       String?
   date_debut            DateTime
   date_fin              DateTime
-  status                String   @default("BROUILLON") // BROUILLON, PLANIFIE, EN_PRODUCTION, TERMINE, ANNULE
-  progress              Float    @default(0.0)
+  status                String   @default("BROUILLON") // BROUILLON, PLANIFIEE, EN_PRODUCTION, TERMINEE, ANNULEE
+  cancellation_reason   String?
   matricule_gl          String
   gl                    User     @relation("GLPlanifications", fields: [matricule_gl], references: [matricule], onDelete: NoAction, onUpdate: NoAction)
   matricule_superviseur String
   superviseur           User     @relation("SuperviseurPlanifications", fields: [matricule_superviseur], references: [matricule], onDelete: NoAction, onUpdate: NoAction)
+  bom_id                String?  @db.ObjectId
+  bom                   BOM?     @relation(fields: [bom_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   // Relations
   panneaux   Panneau[]
   mouvements MouvementStock[]
   history    PlanificationHistory[]
+  actions    PlanificationAction[]
   createdAt  DateTime               @default(now())
   updatedAt  DateTime               @updatedAt
 }
@@ -189,8 +198,8 @@ model Panneau {
   parent_panneau    Panneau?  @relation("PanneauSplits", fields: [parent_panneau_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   child_panneaux    Panneau[] @relation("PanneauSplits")
 
-  bom_id String @db.ObjectId
-  bom            BOM       @relation(fields: [bom_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bom_id String? @db.ObjectId
+  bom            BOM?      @relation(fields: [bom_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   entrepot_id String? @db.ObjectId
   entrepot       Entrepot? @relation(fields: [entrepot_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   superviseur_id String @db.ObjectId
@@ -377,6 +386,35 @@ model PlanificationHistory {
   timestamp        DateTime       @default(now())
 }
 
+model PlanificationAction {
+  id               String        @id @default(auto()) @map("_id") @db.ObjectId
+  planification_id String        @db.ObjectId
+  planification    Planification @relation(fields: [planification_id], references: [id], onDelete: Cascade)
+  nom              String
+  description      String?
+  priorite         String        @default("NORMAL")
+  obligatoire      Boolean       @default(false)
+  status           String        @default("A_FAIRE") // A_FAIRE, EN_COURS, TERMINEE, BLOQUEE
+  checklists       PlanificationActionChecklist[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model PlanificationActionChecklist {
+  id               String              @id @default(auto()) @map("_id") @db.ObjectId
+  action_id        String              @db.ObjectId
+  action           PlanificationAction @relation(fields: [action_id], references: [id], onDelete: Cascade)
+  libelle          String
+  description      String?
+  obligatoire      Boolean             @default(true)
+  is_done          Boolean             @default(false)
+  done_by          String?             @db.ObjectId
+  user             User?               @relation(fields: [done_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  done_at          DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
 // --- MAINTENANCE MODULE ---
 
 model Machine {
@@ -394,6 +432,7 @@ model Machine {
 model Intervention {
   id String @id @default(auto()) @map("_id") @db.ObjectId
   code        String  @unique
+  codeSAP     String?
   title       String?
   description String?
 

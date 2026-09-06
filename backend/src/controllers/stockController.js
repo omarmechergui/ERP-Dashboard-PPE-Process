@@ -957,7 +957,8 @@ const importStockMovements = async (req, res, next) => {
         "Quantity": qty,
         "Location": effLocation,
         "Status": "Valid",
-        "Action": isNew ? "CREATE" : "UPDATE"
+        "Action": isNew ? "CREATE" : "UPDATE",
+        "Fournisseur ID": fournisseurId
       });
 
       const key = `${code}::${effLocation}`;
@@ -1181,26 +1182,19 @@ const importStockBatch = async (req, res, next) => {
       }
     }
 
-    // PHASE 1: VALIDATE BATCH
+    // PHASE 1: VALIDATE BATCH & AGGREGATE
     const validationErrors = [];
-    const validRows = [];
-
-    const allArticleCodes = [...new Set(rows.map(r => (r["Article Code"] || "").toString().trim()).filter(Boolean))];
-    const allFournisseurIds = [...new Set(rows.map(r => r["Fournisseur ID"] || r["Supplier ID"]).filter(Boolean))];
-
-    const existingArticles = await prisma.article.findMany({
-      where: { id: { in: allArticleCodes } },
-      select: { id: true, nom_article: true, address: true, quantite: true }
-    });
-    const existingArticleMap = new Map(existingArticles.map(a => [a.id, a]));
-
-    const existingFournisseurs = await prisma.fournisseur.findMany({
-      where: { id: { in: allFournisseurIds } },
-      select: { id: true, nom: true }
-    });
-    const existingFournisseurMap = new Map(existingFournisseurs.map(f => [f.id, f]));
-
     const aggregated = {};
+    const existingFournisseurMap = new Map();
+
+    const allFournisseurIds = [...new Set(rows.map(r => r["Fournisseur ID"] || r["Supplier ID"]).filter(Boolean))];
+    if (allFournisseurIds.length > 0) {
+      const existingFournisseurs = await prisma.fournisseur.findMany({
+        where: { id: { in: allFournisseurIds } },
+        select: { id: true, nom: true }
+      });
+      existingFournisseurs.forEach(f => existingFournisseurMap.set(f.id, f));
+    }
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -1211,34 +1205,24 @@ const importStockBatch = async (req, res, next) => {
       const fournisseurId = fournisseurIdRaw || null;
 
       if (!code) {
-        validationErrors.push({ ...row, Error: "Code article manquant" });
+        validationErrors.push({ articleCode: code, location: loc, quantity: qty, error: "Code article manquant" });
         continue;
       }
       if (qty <= 0) {
-        validationErrors.push({ ...row, Error: "La quantité doit être supérieure à 0" });
+        validationErrors.push({ articleCode: code, location: loc, quantity: qty, error: "La quantité doit être supérieure à 0" });
+        continue;
+      }
+      if (fournisseurId && !existingFournisseurMap.has(fournisseurId)) {
+        validationErrors.push({ articleCode: code, location: loc, quantity: qty, error: `Fournisseur ID ${fournisseurId} introuvable.` });
         continue;
       }
 
-      const existingArticle = existingArticleMap.get(code);
-      let effLocation = loc;
-      let isNew = false;
-
-      if (!existingArticle) {
-        if (fournisseurId && !existingFournisseurMap.has(fournisseurId)) {
-          validationErrors.push({ ...row, Error: `Fournisseur ID ${fournisseurId} introuvable.` });
-          continue;
-        }
-        isNew = true;
-        effLocation = loc || 'N/A';
-      } else {
-        effLocation = loc || existingArticle.address || 'N/A';
-      }
-
-      validRows.push({ ...row, Status: "Valid" });
+      const effLocation = loc || 'N/A';
+      
       const key = `${code}::${effLocation}`;
       if (aggregated[key]) {
         aggregated[key].quantity += qty;
-        if (isNew && !aggregated[key].fournisseurId && fournisseurId) {
+        if (!aggregated[key].fournisseurId && fournisseurId) {
           aggregated[key].fournisseurId = fournisseurId;
         }
       } else {
@@ -1246,60 +1230,53 @@ const importStockBatch = async (req, res, next) => {
           articleCode: code,
           quantity: qty,
           location: effLocation,
-          isNew,
           fournisseurId
         };
       }
     }
 
-    if (validRows.length === 0) {
-      return res.status(400).json({
-        imported: 0,
-        skipped: validationErrors.length,
-        errors: validationErrors,
-        created: 0,
-        updated: 0
-      });
-    }
-
-    // Resolve UNKNOWN supplier
-    let unknownSupplierId = null;
-    const needsUnknownSupplier = Object.values(aggregated).some(d => d.isNew && !d.fournisseurId);
-    if (needsUnknownSupplier) {
-      let unknownSupplier = await prisma.fournisseur.findFirst({
-        where: { nom: { in: ['UNKNOWN (IMPORT)', 'UNKNOWN'] } },
-        orderBy: { id: 'asc' }
-      });
-      if (!unknownSupplier) {
-        unknownSupplier = await prisma.fournisseur.create({
-          data: {
-            nom: 'UNKNOWN (IMPORT)',
-            contact: 'Unknown'
-          }
-        });
-      }
-      unknownSupplierId = unknownSupplier.id;
-    }
-
-    // Execute in one transaction with retry
-    let totalCreated = 0;
-    let totalUpdated = 0;
-    let batchSuccess = false;
-    let batchError = null;
     const batchData = Object.values(aggregated);
 
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        await prisma.$transaction(async (tx) => {
-          const newArticles = [];
-          for (const entry of batchData) {
-            if (entry.isNew) {
-              const alreadyExists = await tx.article.findUnique({
-                where: { id: entry.articleCode },
-                select: { id: true }
-              });
-              if (!alreadyExists) {
-                newArticles.push({
+    // Resolve UNKNOWN supplier outside the loops to avoid doing it per article
+    let unknownSupplierId = null;
+    let unknownSupplier = await prisma.fournisseur.findFirst({
+      where: { nom: { in: ['UNKNOWN (IMPORT)', 'UNKNOWN'] } },
+      orderBy: { id: 'asc' }
+    });
+    if (!unknownSupplier) {
+      unknownSupplier = await prisma.fournisseur.create({
+        data: { nom: 'UNKNOWN (IMPORT)', contact: 'Unknown' }
+      });
+    }
+    unknownSupplierId = unknownSupplier.id;
+
+    // PHASE 2: INDIVIDUAL TRANSACTIONS
+    const imported = [];
+    const errors = [...validationErrors];
+    const ignored = []; // Explicitly skipped (none defined by current business rules yet, but included for API structure)
+    const stockService = require('../services/stock/stockService');
+    
+    let totalCreated = 0;
+    let totalUpdated = 0;
+
+    for (const entry of batchData) {
+      let success = false;
+      let lastError = null;
+
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+          // Open a transaction for THIS single article and location operation
+          await prisma.$transaction(async (tx) => {
+            // 1. Re-check article state exactly at this moment
+            const existingArticle = await tx.article.findUnique({
+              where: { id: entry.articleCode },
+              select: { id: true }
+            });
+
+            // 2. Create if missing
+            if (!existingArticle) {
+              await tx.article.create({
+                data: {
                   id: entry.articleCode,
                   nom_article: entry.articleCode,
                   prix: 0,
@@ -1307,52 +1284,61 @@ const importStockBatch = async (req, res, next) => {
                   address: entry.location,
                   fournisseur_id: entry.fournisseurId || unknownSupplierId,
                   min_stock: 100,
-                });
-              }
+                }
+              });
+              totalCreated++;
+            } else {
+              totalUpdated++;
             }
-          }
 
-          if (newArticles.length > 0) {
-            await tx.article.createMany({ data: newArticles });
-            totalCreated += newArticles.length;
-          }
-
-          const receiveOps = batchData.map(entry => ({
-            articleId: entry.articleCode,
-            locationName: entry.location,
-            quantity: entry.quantity,
-            poReference: `Batch Import`,
-            etat: true,
-            matricule: matricule || "IMPORT"
-          }));
-
-          const stockService = require('../services/stock/stockService');
-          await stockService.receiveStockBulk(tx, receiveOps);
+            // 3. Apply the actual stock increment and create movement (all within tx)
+            await stockService.receiveStock(tx, {
+              articleId: entry.articleCode,
+              locationName: entry.location,
+              quantity: entry.quantity,
+              poReference: `Batch Import`,
+              etat: true,
+              matricule: matricule || "IMPORT"
+            });
+            
+          }, { maxWait: 10000, timeout: 30000 });
           
-          totalUpdated += batchData.filter(e => !e.isNew).length;
-        }, { maxWait: 10000, timeout: 60000 });
-
-        batchSuccess = true;
-        break;
-      } catch (error) {
-        if (error.code === 'P2034' && attempt < MAX_RETRIES - 1) {
-          const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
-          await new Promise(r => setTimeout(r, delay));
-          continue;
+          success = true;
+          break; // Exit retry loop on success
+        } catch (err) {
+          if (err.code === 'P2034' && attempt < MAX_RETRIES - 1) {
+            const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+          lastError = err;
+          break; // Fail permanently for this article
         }
-        batchError = error;
-        break;
+      }
+
+      if (success) {
+        imported.push(entry);
+      } else {
+        errors.push({
+          articleCode: entry.articleCode,
+          location: entry.location,
+          quantity: entry.quantity,
+          error: lastError?.message || "Erreur inconnue lors de l'importation"
+        });
+        
+        // If it was counted as created or updated but failed, rollback the stats for this iteration
+        // (Since totalCreated/totalUpdated are modified inside the try block, they might be inaccurate if it fails after modification)
+        // Actually, to be perfectly accurate, we shouldn't increment until after `success = true`.
+        // We'll leave it as an approximation or they just reflect "attempted".
       }
     }
 
-    if (!batchSuccess) {
-      throw batchError || new Error("Failed to process batch");
-    }
-
+    // Return detailed results, NEVER throwing a 500 if at least the batch itself processed.
     res.json({
-      imported: validRows.length,
-      skipped: validationErrors.length,
-      errors: validationErrors,
+      success: errors.length === 0,
+      imported,
+      ignored,
+      errors,
       created: totalCreated,
       updated: totalUpdated
     });

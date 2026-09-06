@@ -17,8 +17,9 @@ import AddComponentModal from './components/modals/AddComponentModal';
 import DeleteDialog from './components/modals/DeleteDialog';
 import BomImportModal from './components/modals/BomImportModal';
 
-import LoadingSkeleton from './components/feedback/LoadingSkeleton';
+import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from './components/feedback/EmptyState';
+import PageHeader from '@/components/ui/PageHeader';
 
 export default function BomPage() {
   const {
@@ -166,19 +167,11 @@ export default function BomPage() {
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto p-2 pb-10">
       {/* Header */}
-      <div className="flex justify-between items-end">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-600/20">
-              <Box className="h-6 w-6" />
-            </div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight">BOM</h2>
-          </div>
-          <p className="text-sm text-slate-500 font-medium ml-12">
-            Gestion de la structure des produits et configuration des planches de câblage
-          </p>
-        </div>
-      </div>
+      <PageHeader 
+        icon={Box}
+        title="BOM (Bill of Materials)"
+        description="Gestion de la structure des produits et configuration des planches de câblage"
+      />
 
       {/* Global Feedback */}
       <AnimatePresence>

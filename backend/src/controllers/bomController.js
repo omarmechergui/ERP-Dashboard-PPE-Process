@@ -211,7 +211,10 @@ const deleteBom = async (req, res, next) => {
       return res.status(404).json({ error: "BOM non trouvée" });
     }
 
-    await prisma.bOM.delete({ where: { id: id } });
+    await prisma.$transaction([
+      prisma.bomLigne.deleteMany({ where: { bom_id: id } }),
+      prisma.bOM.delete({ where: { id: id } })
+    ]);
     res.json({ message: "BOM supprimée avec succès" });
   } catch (error) {
     next(error);

@@ -4,14 +4,15 @@
 import React, { useState, useEffect } from "react";
 import { X, Save } from "lucide-react";
 
-export default function CreatePanneauModal({ isOpen, onClose, onSubmit, boms, entrepots, supervisors }) {
+export default function CreatePanneauModal({ isOpen, onClose, onSubmit, boms, entrepots, supervisors, planifications = [] }) {
   const [formData, setFormData] = useState({
     id: "",
     title_panneau: "",
     title_project: "",
     bom_id: "",
     entrepot_id: "",
-    superviseur_id: ""
+    superviseur_id: "",
+    planification_id: ""
   });
   const [error, setError] = useState("");
 
@@ -23,7 +24,8 @@ export default function CreatePanneauModal({ isOpen, onClose, onSubmit, boms, en
         title_project: boms.length > 0 ? boms[0].nom_projet : "Projet Alpha",
         bom_id: boms.length > 0 ? String(boms[0].id) : "",
         entrepot_id: "", // Force user to select
-        superviseur_id: supervisors.length > 0 ? String(supervisors[0].matricule || supervisors[0].id) : ""
+        superviseur_id: supervisors.length > 0 ? String(supervisors[0].matricule || supervisors[0].id) : "",
+        planification_id: ""
       });
       setError("");
     }
@@ -37,6 +39,7 @@ export default function CreatePanneauModal({ isOpen, onClose, onSubmit, boms, en
       ...prev,
       [name]: name === "bom_id" ? (value || null)
             : name === "entrepot_id" ? (value || null)
+            : name === "planification_id" ? (value || null)
             : value
     }));
   };
@@ -146,6 +149,23 @@ export default function CreatePanneauModal({ isOpen, onClose, onSubmit, boms, en
               {entrepots.length === 0 && <option value="" disabled>Aucun entrepôt disponible</option>}
               {entrepots.map((e) => (
                 <option key={e.id} value={e.id} className="text-slate-900">{e.nom} {e.emplacement ? `(${e.emplacement})` : ''}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              Planification liée
+            </label>
+            <select
+              name="planification_id"
+              value={formData.planification_id || ""}
+              onChange={handleInputChange}
+              className={`w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm ${!formData.planification_id ? 'text-slate-400' : ''}`}
+            >
+              <option value="">Aucune planification (Optionnel)</option>
+              {planifications.map((p) => (
+                <option key={p.id} value={p.id} className="text-slate-900">{p.title} - {p.project || "Sans projet"}</option>
               ))}
             </select>
           </div>

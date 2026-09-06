@@ -4,7 +4,7 @@ import { CheckSquare, X, Download } from "lucide-react";
 import { useState } from "react";
 import API from "@/lib/api";
 
-export default function BulkActionsToolbar({ selectedIds, onClearSelection, onActionComplete }) {
+export default function BulkActionsToolbar({ selectedIds, onClearSelection, onActionComplete, onExport }) {
   const [loading, setLoading] = useState(false);
 
   if (!selectedIds || selectedIds.length === 0) return null;
@@ -57,6 +57,7 @@ export default function BulkActionsToolbar({ selectedIds, onClearSelection, onAc
         </button>
         
         <button
+          onClick={onExport}
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
         >

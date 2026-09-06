@@ -5,6 +5,7 @@ const {
   getCommandes,
   getCommandeById,
   receiveCommande,
+  cancelCommande,
 } = require("../controllers/commandeController");
 
 const { protect } = require("../middlewares/auth");
@@ -24,6 +25,9 @@ router.get("/:id", getCommandeById);
 
 // Receive commande
 router.put("/:id/receive", requireRole(["GL", "ADMIN"]), receiveCommande);
+
+// Cancel commande
+router.put("/:id/cancel", requireRole(["GL", "ADMIN"]), cancelCommande);
 
 // Create commande
 // GL + ADMIN

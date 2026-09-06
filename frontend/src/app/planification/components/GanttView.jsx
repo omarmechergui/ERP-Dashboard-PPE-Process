@@ -3,7 +3,7 @@ import { format, differenceInDays, addDays, startOfDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 
-export default function GanttView({ planifications }) {
+export default function GanttView({ planifications, onPlanificationClick }) {
   const { startDate, endDate, totalDays, timelineDays } = useMemo(() => {
     if (!planifications || planifications.length === 0) {
       return { startDate: new Date(), endDate: new Date(), totalDays: 0, timelineDays: [] };
@@ -102,11 +102,14 @@ export default function GanttView({ planifications }) {
           return (
             <div key={plan.id} className="flex border-b border-slate-200 hover:bg-slate-50 transition-colors group">
               {/* Row Header */}
-              <div className="w-64 flex-shrink-0 p-4 border-r border-slate-200 bg-white flex flex-col justify-center relative z-10">
-                <p className="text-sm font-bold text-slate-800 truncate pr-4">{plan.title}</p>
+              <div 
+                className="w-64 flex-shrink-0 p-4 border-r border-slate-200 bg-white flex flex-col justify-center relative z-10 cursor-pointer"
+                onClick={() => onPlanificationClick && onPlanificationClick(plan.id)}
+              >
+                <p className="text-sm font-bold text-slate-800 truncate pr-4">{plan.reference}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">{plan.progress}%</span>
-                  <span className="text-[10px] text-slate-500 truncate">{plan.project || 'Sans projet'}</span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">{plan.progress === null ? '—' : `${plan.progress}%`}</span>
+                  <span className="text-[10px] text-slate-500 truncate">{plan.title}</span>
                 </div>
               </div>
               
@@ -126,12 +129,13 @@ export default function GanttView({ planifications }) {
                   transition={{ duration: 0.6, delay: index * 0.1, ease: "easeOut" }}
                   className={`absolute top-1/2 -translate-y-1/2 h-8 rounded-lg bg-gradient-to-r ${colorClass} border-l-4 shadow-md flex items-center px-3 overflow-hidden cursor-pointer hover:brightness-110 transition-all`}
                   style={{ left: `${left}%` }}
-                  title={`${plan.title} (${plan.progress}%)`}
+                  title={`${plan.reference} - ${plan.title} (${plan.progress === null ? '—' : plan.progress}%)`}
+                  onClick={() => onPlanificationClick && onPlanificationClick(plan.id)}
                 >
                   {/* Progress fill inside the bar */}
                   <div 
                     className="absolute inset-y-0 left-0 bg-white/20" 
-                    style={{ width: `${plan.progress}%` }}
+                    style={{ width: `${plan.progress || 0}%` }}
                   />
                   <span className="text-[10px] font-bold text-white relative z-10 whitespace-nowrap drop-shadow-md">
                     {format(new Date(plan.date_debut), 'dd MMM', { locale: fr })} - {format(new Date(plan.date_fin), 'dd MMM', { locale: fr })}

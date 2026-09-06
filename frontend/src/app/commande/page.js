@@ -2,14 +2,16 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Package, Clock, CheckCircle, AlertTriangle, RefreshCw } from "lucide-react";
+import { Plus, Package, Clock, CheckCircle, AlertTriangle, RefreshCw, Download } from "lucide-react";
 import API from "../../lib/api";
+import * as XLSX from "xlsx-js-style";
 
 import CommandeForm from "./components/CommandeForm";
 import CommandeTable from "./components/CommandeTable";
 import CommandeFilters from "./components/CommandeFilters";
 import BulkActionsToolbar from "./components/BulkActionsToolbar";
 import CommandeDetailsDrawer from "./components/CommandeDetailsDrawer";
+import PageHeader from "../../components/ui/PageHeader";
 
 export default function CommandePage() {
   const [commandes, setCommandes] = useState([]);
@@ -69,6 +71,64 @@ export default function CommandePage() {
     setRefreshKey((prev) => prev + 1);
   };
 
+  const handleExport = () => {
+    try {
+      // Export either selected rows or all filtered rows if none selected
+      const dataToExport = selectedRowIds.length > 0 
+        ? filteredCommandes.filter((c) => selectedRowIds.includes(c.id))
+        : filteredCommandes;
+
+      if (dataToExport.length === 0) {
+        alert("Aucune commande à exporter.");
+        return;
+      }
+
+      const exportData = dataToExport.map((cmd) => {
+        const totalQuantite = cmd.lignes?.reduce((sum, l) => sum + (l.quantite || 0), 0) || 0;
+        return {
+          "Référence": cmd.reference || `CMD${String(cmd.id).padStart(3, "0")}`,
+          "Fournisseur": cmd.fournisseur?.nom || "N/A",
+          "Date": cmd.createdAt ? new Date(cmd.createdAt).toLocaleDateString("fr-FR") : "N/A",
+          "Statut": cmd.status === "PENDING" ? "En attente" : cmd.status === "RECEIVED" ? "Reçue" : cmd.status,
+          "Quantité Totale": totalQuantite,
+          "Total (DT)": cmd.total || 0,
+          "Articles": cmd.lignes?.map(l => l.article?.nom || l.article?.nom_article).join(", ") || "N/A"
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      
+      const headerRange = XLSX.utils.decode_range(worksheet["!ref"]);
+      for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
+        const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c: C })];
+        if (cell) {
+          cell.s = {
+            font: { bold: true, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "4F81BD" } },
+            alignment: { horizontal: "center" }
+          };
+        }
+      }
+      
+      worksheet["!cols"] = [
+        { wch: 15 }, // Ref
+        { wch: 25 }, // Fournisseur
+        { wch: 15 }, // Date
+        { wch: 15 }, // Statut
+        { wch: 15 }, // Qte
+        { wch: 15 }, // Total
+        { wch: 50 }, // Articles
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Commandes");
+      XLSX.writeFile(workbook, `Commandes_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (error) {
+      console.error("Erreur lors de l'export:", error);
+      alert("Une erreur est survenue lors de l'export.");
+    }
+  };
+
   const clearFilters = () => {
     setFilters({ search: "", status: "ALL", dateRange: "ALL" });
   };
@@ -93,37 +153,41 @@ export default function CommandePage() {
   }, [commandes, filters]);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-8">
+    <div className="min-h-screen bg-background p-4 lg:p-8">
       <div className="max-w-[1400px] mx-auto space-y-6">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-              Commandes Fournisseur
-            </h1>
-            <p className="text-slate-500 text-sm mt-1">
-              Centre de contrôle et de gestion des approvisionnements
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={handleRefresh}
-              className="p-2 text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow transition-all"
-              title="Rafraîchir"
-            >
-              <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin text-blue-500" : ""}`} />
-            </button>
-            <button 
-              onClick={() => setIsWizardOpen(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium shadow-sm transition-all active:scale-[0.98]"
-            >
-              <Plus className="w-4 h-4" />
-              Nouvelle Commande
-            </button>
-          </div>
-        </div>
+        <PageHeader 
+          icon={Package}
+          title="Commandes Fournisseur"
+          description="Centre de contrôle et de gestion des approvisionnements"
+          action={
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleExport}
+                className="p-2 text-secondary-foreground hover:text-primary hover:bg-primary/5 bg-card border border-border rounded-lg shadow-sm hover:shadow transition-all flex items-center gap-2"
+                title="Exporter"
+              >
+                <Download className="w-5 h-5" />
+                <span className="hidden md:inline text-sm font-medium">Exporter</span>
+              </button>
+              <button 
+                onClick={handleRefresh}
+                className="p-2 text-secondary-foreground hover:text-foreground bg-card border border-border rounded-lg shadow-sm hover:shadow transition-all"
+                title="Rafraîchir"
+              >
+                <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin text-primary" : ""}`} />
+              </button>
+              <button 
+                onClick={() => setIsWizardOpen(true)}
+                className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all hover:-translate-y-0.5"
+              >
+                <Plus className="w-4 h-4" />
+                Nouvelle Commande
+              </button>
+            </div>
+          }
+        />
 
         {/* KPI Cards Dashboard */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -173,6 +237,7 @@ export default function CommandePage() {
             selectedIds={selectedRowIds} 
             onClearSelection={() => setSelectedRowIds([])}
             onActionComplete={handleRefresh}
+            onExport={handleExport}
           />
 
           <CommandeTable 

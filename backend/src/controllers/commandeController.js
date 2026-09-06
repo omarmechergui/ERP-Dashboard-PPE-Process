@@ -209,9 +209,37 @@ const receiveCommande = async (req, res, next) => {
   }
 };
 
+const cancelCommande = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const commande = await prisma.commande.findUnique({
+      where: { id: id },
+    });
+
+    if (!commande) {
+      return res.status(404).json({ error: "Commande non trouvée" });
+    }
+
+    if (commande.status !== "PENDING") {
+      return res.status(400).json({ error: "Seules les commandes en attente peuvent être annulées" });
+    }
+
+    const updatedCommande = await prisma.commande.update({
+      where: { id: id },
+      data: { status: "ANNULEE" },
+    });
+
+    res.json(updatedCommande);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createCommande,
   getCommandes,
   getCommandeById,
   receiveCommande,
+  cancelCommande,
 };

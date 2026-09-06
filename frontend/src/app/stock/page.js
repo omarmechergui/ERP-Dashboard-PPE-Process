@@ -18,6 +18,7 @@ import { StockTable } from "./components/StockTable";
 import { StockDrawer } from "./components/StockDrawer";
 import { ArticleModal } from "./components/ArticleModal";
 import { ImportWizard } from "../mouvements-stock/components/ImportWizard";
+import LoadingState from '../../components/ui/LoadingSkeleton';
 
 export default function StockPage() {
   const { user } = useAuth();

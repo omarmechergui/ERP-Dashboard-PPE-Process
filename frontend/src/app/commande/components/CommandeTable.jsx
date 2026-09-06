@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, ChevronRight, PackageCheck, PackageOpen } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronRight, PackageCheck, PackageOpen, Ban } from "lucide-react";
 
 export default function CommandeTable({ 
   commandes, 
@@ -143,6 +143,11 @@ export default function CommandeTable({
                       <PackageOpen className="w-4 h-4" />
                       Recevoir
                     </span>
+                  ) : cmd.status === "ANNULEE" ? (
+                    <span className="text-rose-500 flex items-center justify-center gap-1">
+                      <Ban className="w-4 h-4" />
+                      Annulée
+                    </span>
                   ) : (
                     <span className="text-slate-400 flex items-center justify-center gap-1">
                       <PackageCheck className="w-4 h-4" />
@@ -178,6 +183,15 @@ function StatusBadge({ status }) {
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
         <CheckCircle2 className="w-3.5 h-3.5" />
         REÇUE
+      </span>
+    );
+  }
+
+  if (status === "ANNULEE") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+        <Ban className="w-3.5 h-3.5" />
+        ANNULÉE
       </span>
     );
   }

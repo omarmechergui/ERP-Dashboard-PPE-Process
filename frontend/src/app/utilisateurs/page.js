@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/immutability */
+ 
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -13,6 +13,7 @@ import { AuditLogViewer } from './components/AuditLogViewer';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { PhotoUpload } from './components/PhotoUpload';
 import { useAuth } from '../../lib/auth';
+import PageHeader from '../../components/ui/PageHeader';
 
 const VALID_ROLES = ['ADMIN', 'MANAGER', 'GL', 'TL', 'SUPERVISEUR', 'DESIGNER', 'TECHNICIEN', 'TECHNICIENSTOCK', 'OPERATEUR'];
 const VALID_STATUTS = ['ACTIF', 'INACTIF'];
@@ -240,32 +241,29 @@ export default function UtilisateursPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-            <ShieldCheck className="w-8 h-8 text-blue-600" />
-            Gestion des Accès
-          </h1>
-          <p className="text-gray-500 mt-2 font-medium">Gérez les comptes, rôles et l&apos;organisation de l&apos;usine</p>
-        </div>
-        
-        {isAdmin && (
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm shadow-blue-200 hover:bg-blue-700 hover:shadow-md hover:-translate-y-0.5 transition-all"
-          >
-            <UserPlus className="w-5 h-5" />
-            Nouvel Utilisateur
-          </button>
-        )}
-      </div>
+      <PageHeader 
+        icon={ShieldCheck}
+        title="Gestion des Accès"
+        description="Gérez les comptes, rôles et l'organisation de l'usine"
+        action={
+          isAdmin && (
+            <button
+              onClick={handleOpenCreate}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-bold shadow-md hover:bg-primary-hover hover:shadow-lg hover:-translate-y-0.5 transition-all"
+            >
+              <UserPlus className="w-5 h-5" />
+              Nouvel Utilisateur
+            </button>
+          )
+        }
+      />
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-gray-200 pb-px">
+      <div className="flex gap-2 mb-6 border-b border-border pb-px">
         <button
           onClick={() => setActiveTab('LIST')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-colors ${
-            activeTab === 'LIST' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+            activeTab === 'LIST' ? 'border-primary text-primary' : 'border-transparent text-secondary-foreground hover:text-foreground'
           }`}
         >
           <Users className="w-4 h-4" />
@@ -274,7 +272,7 @@ export default function UtilisateursPage() {
         <button
           onClick={() => setActiveTab('ORG')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-colors ${
-            activeTab === 'ORG' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+            activeTab === 'ORG' ? 'border-primary text-primary' : 'border-transparent text-secondary-foreground hover:text-foreground'
           }`}
         >
           <Layout className="w-4 h-4" />
@@ -284,7 +282,7 @@ export default function UtilisateursPage() {
           <button
             onClick={() => setActiveTab('AUDIT')}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-colors ${
-              activeTab === 'AUDIT' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+              activeTab === 'AUDIT' ? 'border-primary text-primary' : 'border-transparent text-secondary-foreground hover:text-foreground'
             }`}
           >
             <History className="w-4 h-4" />
@@ -295,18 +293,18 @@ export default function UtilisateursPage() {
 
       {/* Tab Content */}
       {activeTab === 'LIST' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-300">
+        <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden animate-in fade-in duration-300">
           
           {/* Toolbar */}
-          <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-4 items-center justify-between">
+          <div className="p-4 border-b border-border bg-secondary/30 flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div className="relative w-full sm:w-96">
-              <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-secondary-foreground" />
               <input 
                 type="text" 
                 placeholder="Rechercher (nom, email, matricule)..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
               />
             </div>
             
@@ -314,7 +312,7 @@ export default function UtilisateursPage() {
               <select 
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
-                className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-card border border-border rounded-xl text-sm font-medium text-foreground outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 <option value="ALL">Tous les rôles</option>
                 <option value="ADMIN">Admin</option>
@@ -331,7 +329,7 @@ export default function UtilisateursPage() {
               <button 
                 onClick={loadUsers}
                 disabled={loading}
-                className="p-2.5 bg-white border border-gray-200 rounded-xl text-gray-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all disabled:opacity-50"
+                className="p-2.5 bg-card border border-border rounded-xl text-secondary-foreground hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-all disabled:opacity-50"
                 title="Rafraîchir"
               >
                 <RefreshCcw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
