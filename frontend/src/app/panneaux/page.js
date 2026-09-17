@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback } from "react";
-import { Plus, RefreshCw, AlertCircle, LayoutDashboard, CheckCircle2, X } from "lucide-react";
+import { Plus, RefreshCw, AlertCircle, LayoutDashboard, CheckCircle2, X, MoreVertical, Edit, Trash2, Eye } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { usePanneaux } from "./hooks/usePanneaux";
 
@@ -13,6 +13,11 @@ import DetailPanneauModal from "./components/DetailPanneauModal";
 import HistoryModal from "./components/HistoryModal";
 import PageHeader from "@/components/ui/PageHeader";
 import LoadingState from "@/components/ui/LoadingSkeleton";
+import DataTable from "@/components/ui/DataTable";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { AnimatePresence, motion } from "framer-motion";
 
 // --- Sub-components for UI ---
 const Toast = ({ show, type, message, onClose }) => {
@@ -97,7 +102,9 @@ export default function PanneauxPage() {
   const [selectedSupervisor, setSelectedSupervisor] = useState("");
 
   // UI State
+  const [activeTab, setActiveTab] = useState("kanban");
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
   const [editModal, setEditModal] = useState({ isOpen: false, panneau: null });
   const [detailModal, setDetailModal] = useState({ isOpen: false, panneauId: null });
   const [historyModalState, setHistoryModalState] = useState({ isOpen: false, panneauId: null });
@@ -125,6 +132,127 @@ export default function PanneauxPage() {
       return true;
     });
   }, [panneaux, selectedProject, selectedSupervisor, searchQuery]);
+
+  const columns = [
+    {
+      header: "Panneau",
+      cell: (row) => (
+        <div className="flex flex-col min-w-[150px]">
+          <span className="font-bold text-slate-800 text-[13px]">{row.id}</span>
+          <span className="text-xs text-slate-500 truncate mt-0.5">{row.title_panneau || "—"}</span>
+        </div>
+      )
+    },
+    {
+      header: "Machine",
+      cell: (row) => (
+        <div className="flex flex-col">
+          <span className="font-semibold text-slate-700 text-[13px]">{row.title_project || "—"}</span>
+        </div>
+      )
+    },
+    {
+      header: "Planification",
+      cell: (row) => (
+        <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">
+          {row.planification_id || "Aucune"}
+        </span>
+      )
+    },
+    {
+      header: "Quantité / BOM",
+      cell: (row) => (
+        <div className="flex flex-col text-xs text-slate-600">
+          <span className="font-semibold truncate max-w-[120px]" title={row.bom?.nom_bom}>
+            BOM: {row.bom?.nom_bom || "—"}
+          </span>
+          <span className="text-[11px] text-slate-500 mt-0.5">
+            Composants: {row.composants?.length || 0}
+          </span>
+        </div>
+      )
+    },
+    {
+      header: "Responsable",
+      cell: (row) => (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded bg-emerald-50 text-emerald-700 flex items-center justify-center text-[10px] font-bold">SP</span>
+            <span className="text-[11px] font-medium text-slate-700 truncate max-w-[120px]">{row.superviseur?.nom || "—"}</span>
+          </div>
+        </div>
+      )
+    },
+    {
+      header: "Date",
+      cell: (row) => (
+        <div className="text-[11px] font-medium text-slate-600 whitespace-nowrap">
+          {format(new Date(row.createdAt), 'dd MMM yyyy', { locale: fr })}
+        </div>
+      )
+    },
+    {
+      header: "Statut",
+      cell: (row) => <StatusBadge status={row.etat_construction} />
+    },
+    {
+      header: "Actions",
+      align: "right",
+      cell: (row) => (
+        <div className="relative flex justify-end">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenDropdown(openDropdown === row.id ? null : row.id);
+            }} 
+            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+          
+          <AnimatePresence>
+            {openDropdown === row.id && (
+              <>
+                <motion.div 
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  exit={{ opacity: 0 }} 
+                  className="fixed inset-0 z-10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenDropdown(null);
+                  }}
+                />
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }} 
+                  animate={{ opacity: 1, scale: 1, y: 0 }} 
+                  exit={{ opacity: 0, scale: 0.95, y: -10 }} 
+                  className="absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 shadow-lg rounded-xl z-20 py-1 overflow-hidden"
+                >
+                  <button onClick={(e) => { e.stopPropagation(); setOpenDropdown(null); handleView(row); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-colors">
+                    <Eye className="w-4 h-4" /> Voir
+                  </button>
+                  {isWriteAllowed && (
+                    <button onClick={(e) => { e.stopPropagation(); setOpenDropdown(null); handleEdit(row); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-amber-600 transition-colors">
+                      <Edit className="w-4 h-4" /> Modifier
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <>
+                      <div className="h-px bg-slate-100 my-1" />
+                      <button onClick={(e) => { e.stopPropagation(); setOpenDropdown(null); handleDelete(row); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 transition-colors">
+                        <Trash2 className="w-4 h-4" /> Supprimer
+                      </button>
+                    </>
+                  )}
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
+      )
+    }
+  ];
 
   // Execute actual API update (Non-optimistic)
   const performStatusUpdate = useCallback(async (panneauId, destColumn, reason = null) => {
@@ -243,7 +371,29 @@ export default function PanneauxPage() {
           title="Panneaux (Kanban)"
           description="Suivi de production MES et assemblage"
           action={
-            <div className="flex items-center gap-3">
+            <div className="flex gap-3 items-center">
+              <div className="bg-slate-100 p-1 rounded-xl flex border border-slate-200 mr-2">
+                <button
+                  onClick={() => setActiveTab("kanban")}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                    activeTab === "kanban"
+                      ? "bg-white text-blue-700 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  Kanban
+                </button>
+                <button
+                  onClick={() => setActiveTab("liste")}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                    activeTab === "liste"
+                      ? "bg-white text-blue-700 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  Liste
+                </button>
+              </div>
               <button 
                 onClick={fetchAll}
                 className="p-2.5 text-secondary-foreground hover:text-primary hover:bg-secondary rounded-lg transition-colors border border-transparent"
@@ -285,24 +435,39 @@ export default function PanneauxPage() {
           setSelectedSupervisor={setSelectedSupervisor}
         />
 
-        {/* Kanban Board */}
-        <div className="relative">
+        {/* Content View */}
+        <div className="relative mt-6">
           {dataLoading && (
             <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[1px] flex items-center justify-center rounded-2xl">
               <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
             </div>
           )}
           
-          <KanbanBoard 
-            panneaux={filteredPanneaux}
-            onDragEnd={handleDragEnd}
-            isWriteAllowed={isWriteAllowed}
-            onHistoryClick={(id) => setHistoryModalState({ isOpen: true, panneauId: id })}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onView={handleView}
-            loadingPanneauId={loadingPanneauId}
-          />
+          <AnimatePresence mode="wait">
+            {activeTab === "kanban" ? (
+              <motion.div key="kanban" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                <KanbanBoard 
+                  panneaux={filteredPanneaux}
+                  onDragEnd={handleDragEnd}
+                  isWriteAllowed={isWriteAllowed}
+                  onHistoryClick={(id) => setHistoryModalState({ isOpen: true, panneauId: id })}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onView={handleView}
+                  loadingPanneauId={loadingPanneauId}
+                />
+              </motion.div>
+            ) : (
+              <motion.div key="liste" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+                <DataTable
+                  columns={columns}
+                  data={filteredPanneaux}
+                  loading={dataLoading}
+                  onRowClick={(row) => handleView(row)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Modals & Toasts */}

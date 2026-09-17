@@ -20,8 +20,9 @@ const createPlanificationSchema = z.object({
   matricule_gl: z.string().min(1, "Le GL est requis"),
   matricule_superviseur: z.string().min(1, "Le Superviseur est requis"),
   bom_id: z.string().optional().nullable(),
-  quantite: z.number().int().min(1).optional().nullable(),
-  production_mode: z.enum(['BOM', 'FIX', 'MANUEL']).optional().nullable(),
+  quantite: z.number().int().min(0).optional().nullable(),
+  production_mode: z.enum(['BOM', 'FIX', 'MANUEL', 'AUCUNE']).optional().nullable(),
+  progress: z.number().int().min(0).max(100).optional().nullable(),
   actions: z.array(z.object({
     nom: z.string(),
     description: z.string().optional(),
@@ -34,14 +35,16 @@ const createPlanificationSchema = z.object({
     })).optional()
   })).optional(),
   panneaux: z.array(z.object({
-    title_panneau: z.string()
+    id: z.string().optional(),
+    title_panneau: z.string().optional()
   })).optional()
 }).superRefine((data, ctx) => {
-  if (data.production_mode === 'BOM' && (data.quantite === null || data.quantite === undefined)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La quantité est requise pour le mode BOM", path: ["quantite"] });
+  if (data.production_mode === 'BOM' && (data.quantite === null || data.quantite === undefined || data.quantite < 1)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La quantité est requise et doit être au moins 1 pour le mode BOM", path: ["quantite"] });
   }
-  if (data.quantite && !data.production_mode) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le mode de production (BOM ou Fix) est requis si une quantité est définie", path: ["production_mode"] });
+  // Allow quantite for AUCUNE mode too.
+  if (data.quantite && data.production_mode && !['BOM', 'FIX', 'AUCUNE'].includes(data.production_mode)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le mode de production BOM, Fix ou AUCUNE est requis si une quantité est définie", path: ["production_mode"] });
   }
   if (data.production_mode === 'FIX' && (!data.panneaux || data.panneaux.length === 0)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Au moins un panneau est requis pour le mode Fix", path: ["panneaux"] });
@@ -62,8 +65,9 @@ const updatePlanificationSchema = z.object({
   matricule_gl: z.string().optional(),
   matricule_superviseur: z.string().optional(),
   bom_id: z.string().optional().nullable(),
-  quantite: z.number().int().min(1).optional().nullable(),
-  production_mode: z.enum(['BOM', 'FIX', 'MANUEL']).optional().nullable(),
+  quantite: z.number().int().min(0).optional().nullable(),
+  production_mode: z.enum(['BOM', 'FIX', 'MANUEL', 'AUCUNE']).optional().nullable(),
+  progress: z.number().int().min(0).max(100).optional().nullable(),
   actions: z.array(z.object({
     nom: z.string(),
     description: z.string().optional(),
@@ -76,14 +80,15 @@ const updatePlanificationSchema = z.object({
     })).optional()
   })).optional(),
   panneaux: z.array(z.object({
-    title_panneau: z.string()
+    id: z.string().optional(),
+    title_panneau: z.string().optional()
   })).optional()
 }).superRefine((data, ctx) => {
-  if (data.production_mode === 'BOM' && (data.quantite === null || data.quantite === undefined)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La quantité est requise pour le mode BOM", path: ["quantite"] });
+  if (data.production_mode === 'BOM' && (data.quantite === null || data.quantite === undefined || data.quantite < 1)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La quantité est requise et doit être au moins 1 pour le mode BOM", path: ["quantite"] });
   }
-  if (data.quantite && data.production_mode && data.production_mode !== 'BOM' && data.production_mode !== 'FIX') {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le mode de production BOM ou Fix est requis pour une quantité", path: ["production_mode"] });
+  if (data.quantite && data.production_mode && !['BOM', 'FIX', 'AUCUNE'].includes(data.production_mode)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le mode de production BOM, Fix ou AUCUNE est requis pour une quantité", path: ["production_mode"] });
   }
   if (data.production_mode === 'FIX' && (!data.panneaux || data.panneaux.length === 0)) {
     // Only apply if they passed panneaux (during partial update they might not)
@@ -267,24 +272,26 @@ const createPlanification = async (req, res, next) => {
         const superviseurId = (await tx.user.findUnique({ where: { matricule: planificationData.matricule_superviseur } }))?.id;
         if (!superviseurId) throw new Error("Superviseur introuvable pour la création des panneaux.");
 
-        // We generate custom panel IDs for FIX/MANUEL. E.g. PNL-FIX-... or similar.
-        // Assuming we have a sequence generator or we just use reference-index
         for (let i = 0; i < panneaux.length; i++) {
-          const panneauId = `${reference}-PNL-${(i + 1).toString().padStart(3, '0')}`;
-          await tx.panneau.create({
-            data: {
-              id: panneauId,
-              title_panneau: panneaux[i].title_panneau,
-              title_project: planificationData.project || "N/A",
-              etat_construction: "EN_CONSTRUCTION",
-              planification_id: newPlanification.id,
-              superviseur_id: superviseurId,
-              // Requires bom_id in schema? Yes, bom_id is required in Panneau schema!
-              // Wait, bom_id is String @db.ObjectId in Panneau.
-              // We need a dummy or to make it optional in schema?
-              // Let's check schema.prisma
-            }
-          });
+          const panneauInput = panneaux[i];
+          if (planificationData.production_mode === 'FIX' && panneauInput.id) {
+             await tx.panneau.update({
+               where: { id: panneauInput.id },
+               data: { planification_id: newPlanification.id }
+             });
+          } else if (panneauInput.title_panneau) {
+             const panneauId = `${reference}-PNL-${(i + 1).toString().padStart(3, '0')}`;
+             await tx.panneau.create({
+               data: {
+                 id: panneauId,
+                 title_panneau: panneauInput.title_panneau,
+                 title_project: planificationData.project || "N/A",
+                 etat_construction: "EN_CONSTRUCTION",
+                 planification_id: newPlanification.id,
+                 superviseur_id: superviseurId,
+               }
+             });
+          }
         }
       }
 
@@ -367,13 +374,32 @@ const updatePlanification = async (req, res, next) => {
       if (panneaux && panneaux.length > 0 && (updates.production_mode === 'FIX' || updates.production_mode === 'MANUEL' || planification.production_mode === 'FIX' || planification.production_mode === 'MANUEL')) {
          const superviseurId = (await tx.user.findUnique({ where: { matricule: updated.matricule_superviseur } }))?.id;
          if (superviseurId) {
-             // Create only those without IDs if the user passed them?
-             // Since this is a simple update, we assume if they pass `panneaux` they want to add them.
-             // We will generate random IDs or sequential
+             // Remove old links
+             await tx.panneau.updateMany({
+               where: { planification_id: id },
+               data: { planification_id: null }
+             });
+             
              for (let i = 0; i < panneaux.length; i++) {
-                 // Check if it exists? We don't have their IDs here, they are just strings.
-                 // In a real app we'd have a separate endpoint to add a panneau to a planification.
-                 // For now, let's ignore adding panneaux on update to keep it safe, or just allow the create workflow.
+                 const panneauInput = panneaux[i];
+                 if (panneauInput.id) {
+                     await tx.panneau.update({
+                         where: { id: panneauInput.id },
+                         data: { planification_id: id }
+                     });
+                 } else if (panneauInput.title_panneau) {
+                     const panneauId = `${updated.reference}-PNL-${(Date.now() + i).toString().slice(-4)}`;
+                     await tx.panneau.create({
+                         data: {
+                             id: panneauId,
+                             title_panneau: panneauInput.title_panneau,
+                             title_project: updated.project || "N/A",
+                             etat_construction: "EN_CONSTRUCTION",
+                             planification_id: id,
+                             superviseur_id: superviseurId,
+                         }
+                     });
+                 }
              }
          }
       }
@@ -538,6 +564,150 @@ const cancelPlanification = async (req, res, next) => {
   }
 };
 
+const completePlanification = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const planification = await prisma.$transaction(async (tx) => {
+      const p = await tx.planification.findUnique({ where: { id } });
+      if (!p) throw new Error('Planification non trouvée');
+
+      validateTransition(p.status, STATUSES.TERMINEE);
+
+      const updated = await tx.planification.update({
+        where: { id },
+        data: { status: STATUSES.TERMINEE }
+      });
+
+      await tx.planificationHistory.create({
+        data: {
+          planification: { connect: { id } },
+          user: { connect: { matricule: req.user.matricule } },
+          action: 'STATUS_CHANGE',
+          description: 'Production terminée',
+          oldValue: p.status,
+          newValue: STATUSES.TERMINEE
+        }
+      });
+
+      return updated;
+    });
+
+    res.json(planification);
+  } catch (error) {
+    if (error.message.includes('non trouvée')) {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(400).json({ error: error.message });
+  }
+};
+
+const updateProgress = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { progress } = req.body;
+    
+    if (progress === undefined || progress < 0 || progress > 100) {
+      return res.status(400).json({ error: "Progrès invalide (doit être entre 0 et 100)" });
+    }
+
+    const planification = await prisma.$transaction(async (tx) => {
+      const p = await tx.planification.findUnique({ where: { id } });
+      if (!p) throw new Error('Planification non trouvée');
+
+      const updated = await tx.planification.update({
+        where: { id },
+        data: { progress }
+      });
+
+      await tx.planificationHistory.create({
+        data: {
+          planification: { connect: { id } },
+          user: { connect: { matricule: req.user.matricule } },
+          action: 'PROGRESSION_CHANGE',
+          description: 'Mise à jour du progrès',
+          oldValue: String(p.progress || 0),
+          newValue: String(progress)
+        }
+      });
+
+      return updated;
+    });
+
+    res.json(planification);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const addPanneauToPlanification = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { panneauId } = req.body;
+    
+    if (!panneauId) {
+      return res.status(400).json({ error: "L'ID du panneau est requis" });
+    }
+
+    const planification = await prisma.$transaction(async (tx) => {
+      const p = await tx.planification.findUnique({ where: { id } });
+      if (!p) throw new Error('Planification non trouvée');
+      
+      const panneau = await tx.panneau.findUnique({ where: { id: panneauId } });
+      if (!panneau) throw new Error('Panneau non trouvé');
+
+      if (panneau.planification_id) {
+         if (panneau.planification_id === id) throw new Error('Le panneau est déjà lié à cette planification');
+         throw new Error('Le panneau est déjà lié à une autre planification');
+      }
+
+      await tx.panneau.update({
+        where: { id: panneauId },
+        data: { planification_id: id }
+      });
+
+      return p;
+    });
+    res.json(planification);
+  } catch (error) {
+    if (error.message.includes('trouvé')) {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(400).json({ error: error.message });
+  }
+};
+
+const removePanneauFromPlanification = async (req, res, next) => {
+  try {
+    const { id, panneauId } = req.params;
+    
+    const planification = await prisma.$transaction(async (tx) => {
+      const p = await tx.planification.findUnique({ where: { id } });
+      if (!p) throw new Error('Planification non trouvée');
+      
+      const panneau = await tx.panneau.findUnique({ where: { id: panneauId } });
+      if (!panneau) throw new Error('Panneau non trouvé');
+
+      if (panneau.planification_id !== id) {
+         throw new Error('Le panneau n\'est pas lié à cette planification');
+      }
+
+      await tx.panneau.update({
+        where: { id: panneauId },
+        data: { planification_id: null }
+      });
+
+      return p;
+    });
+    res.json(planification);
+  } catch (error) {
+    if (error.message.includes('trouvé')) {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(400).json({ error: error.message });
+  }
+};
+
 
 const deletePlanification = async (req, res, next) => {
   try {
@@ -654,9 +824,13 @@ module.exports = {
   updatePlanification,
   planifierPlanification,
   startProduction,
+  completePlanification,
   cancelPlanification,
   deletePlanification,
   getPlanificationHistory,
   getDashboardStats,
-  getPlanificationPanneaux
+  getPlanificationPanneaux,
+  updateProgress,
+  addPanneauToPlanification,
+  removePanneauFromPlanification
 };

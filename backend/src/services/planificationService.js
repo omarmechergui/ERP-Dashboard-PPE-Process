@@ -47,18 +47,20 @@ const validateTransition = (currentStatus, newStatus) => {
  */
 const computeProgress = (planification) => {
   if (![STATUSES.EN_PRODUCTION, STATUSES.TERMINEE].includes(planification.status)) {
-    return null;
+    return 0; // Better UX to return 0 than null for non-started ones
   }
   
-  if (!planification.quantite || planification.quantite === 0) {
-    return 0;
+  // If we have attached panneaux, calculate dynamically
+  if (planification.panneaux && planification.panneaux.length > 0) {
+    const completedPanneaux = planification.panneaux.filter(
+      (p) => p.etat_construction === 'TERMINE'
+    ).length;
+    
+    return Math.min(100, Math.round((completedPanneaux / planification.panneaux.length) * 100));
   }
 
-  const completedPanneaux = (planification.panneaux || []).filter(
-    (p) => p.etat_construction === 'TERMINE'
-  ).length;
-
-  return Math.min(100, Math.round((completedPanneaux / planification.quantite) * 100));
+  // Fallback to manual progress if no panneaux are attached (e.g. Mode AUCUNE)
+  return planification.progress || 0;
 };
 
 /**
@@ -69,11 +71,11 @@ const computeProgress = (planification) => {
 const getEditableFields = (status) => {
   switch (status) {
     case STATUSES.BROUILLON:
-      return ['title', 'project', 'customer', 'description', 'priority', 'date_debut', 'date_fin', 'matricule_gl', 'matricule_superviseur', 'bom_id', 'quantite'];
+      return ['title', 'project', 'customer', 'description', 'priority', 'date_debut', 'date_fin', 'matricule_gl', 'matricule_superviseur', 'bom_id', 'quantite', 'production_mode', 'progress'];
     case STATUSES.PLANIFIEE:
-      return ['description', 'priority', 'date_debut', 'date_fin', 'matricule_gl', 'matricule_superviseur'];
+      return ['description', 'priority', 'date_debut', 'date_fin', 'matricule_gl', 'matricule_superviseur', 'progress'];
     case STATUSES.EN_PRODUCTION:
-      return ['description', 'priority', 'date_fin'];
+      return ['description', 'priority', 'date_fin', 'progress'];
     case STATUSES.TERMINEE:
     case STATUSES.ANNULEE:
       return ['description']; // Only description is editable once finished/cancelled

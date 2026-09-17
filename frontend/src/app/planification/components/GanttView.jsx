@@ -95,9 +95,11 @@ export default function GanttView({ planifications, onPlanificationClick }) {
           const left = getDayOffsetPercentage(plan.date_debut);
           const width = getDurationPercentage(plan.date_debut, plan.date_fin) || 1; // min 1%
           
-          let colorClass = "from-blue-600 to-blue-400 border-blue-400";
-          if (plan.progress === 100) colorClass = "from-emerald-600 to-emerald-400 border-emerald-400";
-          else if (plan.progress < 40) colorClass = "from-amber-600 to-amber-400 border-amber-400";
+          let colorClass = "from-slate-500 to-slate-400 border-slate-400"; // Default (BROUILLON)
+          if (plan.status === 'PLANIFIEE') colorClass = "from-blue-500 to-blue-400 border-blue-400";
+          else if (plan.status === 'EN_PRODUCTION') colorClass = "from-amber-500 to-amber-400 border-amber-400";
+          else if (plan.status === 'TERMINEE') colorClass = "from-emerald-500 to-emerald-400 border-emerald-400";
+          else if (plan.status === 'ANNULEE') colorClass = "from-rose-500 to-rose-400 border-rose-400";
 
           return (
             <div key={plan.id} className="flex border-b border-slate-200 hover:bg-slate-50 transition-colors group">
@@ -127,14 +129,14 @@ export default function GanttView({ planifications, onPlanificationClick }) {
                   initial={{ width: 0, opacity: 0 }}
                   animate={{ width: `${width}%`, opacity: 1 }}
                   transition={{ duration: 0.6, delay: index * 0.1, ease: "easeOut" }}
-                  className={`absolute top-1/2 -translate-y-1/2 h-8 rounded-lg bg-gradient-to-r ${colorClass} border-l-4 shadow-md flex items-center px-3 overflow-hidden cursor-pointer hover:brightness-110 transition-all`}
+                  className={`absolute top-1/2 -translate-y-1/2 h-8 rounded-lg bg-gradient-to-r ${colorClass} border-l-4 shadow-md flex items-center px-3 overflow-hidden cursor-pointer hover:brightness-110 transition-all group/bar`}
                   style={{ left: `${left}%` }}
-                  title={`${plan.reference} - ${plan.title} (${plan.progress === null ? '—' : plan.progress}%)`}
+                  title={`${plan.reference} - ${plan.title}\nStatut: ${plan.status}\nProgrès: ${plan.progress === null ? '—' : plan.progress}%\nDu ${format(new Date(plan.date_debut), 'dd MMM yyyy')} au ${format(new Date(plan.date_fin), 'dd MMM yyyy')}`}
                   onClick={() => onPlanificationClick && onPlanificationClick(plan.id)}
                 >
                   {/* Progress fill inside the bar */}
                   <div 
-                    className="absolute inset-y-0 left-0 bg-white/20" 
+                    className="absolute inset-y-0 left-0 bg-white/30" 
                     style={{ width: `${plan.progress || 0}%` }}
                   />
                   <span className="text-[10px] font-bold text-white relative z-10 whitespace-nowrap drop-shadow-md">

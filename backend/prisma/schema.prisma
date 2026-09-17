@@ -160,6 +160,7 @@ model Planification {
   priority              String   @default("NORMAL")
   quantite              Int?
   production_mode       String?
+  progress              Int      @default(0)
   date_debut            DateTime
   date_fin              DateTime
   status                String   @default("BROUILLON") // BROUILLON, PLANIFIEE, EN_PRODUCTION, TERMINEE, ANNULEE

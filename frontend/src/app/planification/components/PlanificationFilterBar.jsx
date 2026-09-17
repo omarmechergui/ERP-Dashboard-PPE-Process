@@ -1,10 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function PlanificationFilterBar({ filters, onFilterChange, boms, users }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [localSearch, setLocalSearch] = useState(filters.search || '');
+
   const activeFiltersCount = Object.values(filters).filter(v => v !== '' && v !== null).length;
+
+  useEffect(() => {
+    setLocalSearch(filters.search || '');
+  }, [filters.search]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== filters.search) {
+        onFilterChange({ ...filters, search: localSearch });
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [localSearch, filters, onFilterChange]);
 
   const handleChange = (key, value) => {
     onFilterChange({ ...filters, [key]: value });
@@ -17,7 +32,8 @@ export default function PlanificationFilterBar({ filters, onFilterChange, boms, 
       matricule_gl: '',
       matricule_superviseur: '',
       date_debut: '',
-      date_fin: ''
+      date_fin: '',
+      status: ''
     });
   };
 
@@ -30,13 +46,13 @@ export default function PlanificationFilterBar({ filters, onFilterChange, boms, 
           <input
             type="text"
             placeholder="Rechercher (référence, projet, client...)"
-            value={filters.search}
-            onChange={(e) => handleChange('search', e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-slate-700"
           />
-          {filters.search && (
+          {localSearch && (
             <button
-              onClick={() => handleChange('search', '')}
+              onClick={() => setLocalSearch('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
             >
               <X className="w-4 h-4" />
@@ -84,13 +100,30 @@ export default function PlanificationFilterBar({ filters, onFilterChange, boms, 
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="pt-4 mt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="pt-4 mt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               
+              {/* Status Select */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Statut</label>
+                <select
+                  value={filters.status || ''}
+                  onChange={(e) => handleChange('status', e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
+                >
+                  <option value="">Tous les statuts</option>
+                  <option value="BROUILLON">Brouillon</option>
+                  <option value="PLANIFIEE">Planifiée</option>
+                  <option value="EN_PRODUCTION">En Production</option>
+                  <option value="TERMINEE">Terminée</option>
+                  <option value="ANNULEE">Annulée</option>
+                </select>
+              </div>
+
               {/* BOM Select */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nomenclature (BOM)</label>
                 <select
-                  value={filters.bom_id}
+                  value={filters.bom_id || ''}
                   onChange={(e) => handleChange('bom_id', e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
                 >
@@ -105,7 +138,7 @@ export default function PlanificationFilterBar({ filters, onFilterChange, boms, 
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Group Leader</label>
                 <select
-                  value={filters.matricule_gl}
+                  value={filters.matricule_gl || ''}
                   onChange={(e) => handleChange('matricule_gl', e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
                 >
@@ -120,7 +153,7 @@ export default function PlanificationFilterBar({ filters, onFilterChange, boms, 
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Superviseur</label>
                 <select
-                  value={filters.matricule_superviseur}
+                  value={filters.matricule_superviseur || ''}
                   onChange={(e) => handleChange('matricule_superviseur', e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
                 >
@@ -133,11 +166,21 @@ export default function PlanificationFilterBar({ filters, onFilterChange, boms, 
 
               {/* Dates */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">À partir de</label>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date début min</label>
                 <input
                   type="date"
-                  value={filters.date_debut}
+                  value={filters.date_debut || ''}
                   onChange={(e) => handleChange('date_debut', e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date fin max</label>
+                <input
+                  type="date"
+                  value={filters.date_fin || ''}
+                  onChange={(e) => handleChange('date_fin', e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
                 />
               </div>

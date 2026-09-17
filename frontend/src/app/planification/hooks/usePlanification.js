@@ -135,6 +135,34 @@ export function usePlanification() {
     }
   }, []);
 
+  const completePlanification = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await API.post(`/planifications/${id}/complete`);
+      return res.data;
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur lors de la clôture de la production");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const updateProgress = useCallback(async (id, progress) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await API.patch(`/planifications/${id}/progress`, { progress });
+      return res.data;
+    } catch (err) {
+      setError(err.response?.data?.error || "Erreur lors de la mise à jour du progrès");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const deletePlanification = useCallback(async (id) => {
     setLoading(true);
     setError(null);
@@ -174,6 +202,25 @@ export function usePlanification() {
     }
   }, []);
 
+  const searchPanneaux = useCallback(async (query, signal) => {
+    try {
+      const params = new URLSearchParams();
+      if (query) params.append('search', query);
+      // Depending on the backend logic we can filter by status 'READY' 
+      // though the `/panneaux` backend endpoint might not support `search` yet.
+      // We will handle search properly.
+      const res = await API.get(`/panneaux?${params.toString()}`, { signal });
+      
+      // Filter out panneaux that already have a planification linked if needed, or backend should do it
+      // Let's return all and let the component handle filtering.
+      return res.data;
+    } catch (err) {
+      if (err.name === 'CanceledError') return []; // Ignore abort errors
+      console.error('Erreur recherche panneaux', err);
+      return [];
+    }
+  }, []);
+
   return {
     loading,
     error,
@@ -185,9 +232,12 @@ export function usePlanification() {
     updatePlanification,
     planifier,
     startProduction,
+    completePlanification,
+    updateProgress,
     cancelPlanification,
     deletePlanification,
     loadBoms,
-    loadUsers
+    loadUsers,
+    searchPanneaux
   };
 }

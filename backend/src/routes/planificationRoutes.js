@@ -10,7 +10,11 @@ const {
   deletePlanification,
   getPlanificationHistory,
   getDashboardStats,
-  getPlanificationPanneaux
+  getPlanificationPanneaux,
+  completePlanification,
+  updateProgress,
+  addPanneauToPlanification,
+  removePanneauFromPlanification
 } = require('../controllers/planificationController');
 const { protect } = require('../middlewares/auth');
 const requireRole = require('../middlewares/role');
@@ -35,7 +39,13 @@ router.put('/:id', requireRole(['GL', 'ADMIN']), updatePlanification);
 // Transition routes
 router.post('/:id/planifier', requireRole(['GL', 'ADMIN']), planifierPlanification);
 router.post('/:id/start', requireRole(['GL', 'ADMIN']), startProduction);
+router.post('/:id/complete', requireRole(['GL', 'ADMIN']), completePlanification);
 router.post('/:id/cancel', requireRole(['GL', 'ADMIN', 'SUPERVISEUR']), cancelPlanification);
+router.patch('/:id/progress', requireRole(['GL', 'ADMIN', 'SUPERVISEUR']), updateProgress);
+
+// Panneaux management
+router.post('/:id/panneaux', requireRole(['GL', 'ADMIN']), addPanneauToPlanification);
+router.delete('/:id/panneaux/:panneauId', requireRole(['GL', 'ADMIN']), removePanneauFromPlanification);
 
 // Delete route
 router.delete('/:id', requireRole(['GL', 'ADMIN']), deletePlanification);

@@ -17,8 +17,9 @@ export default function PlanificationDetailPage({ params }) {
   const router = useRouter();
   const { id } = use(params);
   
-  const { getPlanificationById, planifier, startProduction, cancelPlanification, loading } = usePlanification();
+  const { getPlanificationById, planifier, startProduction, cancelPlanification, completePlanification, getHistory, loading } = usePlanification();
   const [data, setData] = useState(null);
+  const [history, setHistory] = useState([]);
   
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -27,14 +28,27 @@ export default function PlanificationDetailPage({ params }) {
     try {
       const p = await getPlanificationById(id);
       setData(p);
+      const h = await getHistory(id);
+      setHistory(h || []);
     } catch (err) {
       console.error(err);
     }
-  }, [id, getPlanificationById]);
+  }, [id, getPlanificationById, getHistory]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleComplete = async () => {
+    if (confirm("Voulez-vous vraiment terminer la production ?")) {
+      try {
+        await completePlanification(id);
+        fetchData();
+      } catch (err) {
+        alert("Erreur: " + (err.response?.data?.error || err.message));
+      }
+    }
+  };
 
   const handlePlanifier = async () => {
     try {
@@ -68,7 +82,15 @@ export default function PlanificationDetailPage({ params }) {
   };
 
   if (loading && !data) {
-    return <div className="flex h-screen items-center justify-center">Chargement...</div>;
+    return (
+      <div className="min-h-screen bg-slate-50/50 pb-24 p-6 animate-pulse">
+        <div className="h-16 bg-white rounded-xl mb-6"></div>
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 h-96 bg-white rounded-xl"></div>
+          <div className="h-96 bg-white rounded-xl"></div>
+        </div>
+      </div>
+    );
   }
 
   if (!data) {
@@ -127,6 +149,15 @@ export default function PlanificationDetailPage({ params }) {
               className="px-4 py-2 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-sm transition-colors flex items-center gap-2"
             >
               <PlayCircle className="w-4 h-4" /> Lancer la production
+            </button>
+          )}
+
+          {isEnProd && (
+            <button
+              onClick={handleComplete}
+              className="px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm transition-colors flex items-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" /> Terminer la production
             </button>
           )}
         </div>
@@ -264,14 +295,23 @@ export default function PlanificationDetailPage({ params }) {
                   </div>
                 </div>
 
-                <div className="mt-6 flex justify-end">
-                  <Link 
-                    href="/panneaux" 
-                    className="text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                  >
-                    Voir tous les panneaux liés <ExternalLink className="w-4 h-4" />
-                  </Link>
-                </div>
+                {/* Panneaux List */}
+                {data.panneaux && data.panneaux.length > 0 && (
+                  <div className="mt-8">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Liste des panneaux liés</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+                      {data.panneaux.map((panneau) => (
+                        <Link key={panneau.id} href={`/panneaux`} className="flex items-center justify-between p-3 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors group">
+                           <div>
+                             <p className="text-sm font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{panneau.title_panneau}</p>
+                             <p className="text-[10px] text-slate-500 font-mono mt-0.5">{panneau.id}</p>
+                           </div>
+                           <StatusBadge status={panneau.etat_construction} className="scale-75 origin-right" />
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -333,6 +373,36 @@ export default function PlanificationDetailPage({ params }) {
               </div>
 
             </div>
+          </div>
+
+          {/* Historique */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+              <Clock className="w-4 h-4" /> Historique
+            </h3>
+            
+            {history.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-4">Aucun historique disponible.</p>
+            ) : (
+              <div className="space-y-4 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+                {history.map((h, i) => (
+                  <div key={i} className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {h.action.includes('ANNULEE') ? <AlertCircle className="w-3.5 h-3.5 text-rose-500" /> :
+                       h.action.includes('TERMINEE') ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> :
+                       <Clock className="w-3.5 h-3.5 text-blue-500" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">{h.action}</p>
+                      {h.details && <p className="text-xs text-slate-600 mt-0.5">{h.details}</p>}
+                      <p className="text-[10px] text-slate-400 mt-1 font-mono">
+                        {format(new Date(h.timestamp), 'dd MMM yyyy HH:mm', { locale: fr })} • par {h.performed_by?.nom || 'Système'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
         </div>

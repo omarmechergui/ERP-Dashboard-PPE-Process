@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { usePlanification } from "./hooks/usePlanification";
 import PageHeader from "../../components/ui/PageHeader";
-import { Calendar, Plus, RefreshCw, BarChart2 } from "lucide-react";
+import { Calendar, Plus, RefreshCw, BarChart2, MoreVertical, Edit, Trash2, Eye, AlertCircle, X } from "lucide-react";
 import DataTable from "../../components/ui/DataTable";
 import StatusBadge from "../../components/ui/StatusBadge";
 import ProgressBar from "../../components/ui/ProgressBar";
@@ -24,7 +24,8 @@ export default function PlanificationPage() {
     loadPlanifications, 
     loadDashboardStats, 
     loadBoms, 
-    loadUsers 
+    loadUsers,
+    deletePlanification
   } = usePlanification();
   
   const [data, setData] = useState([]);
@@ -46,8 +47,38 @@ export default function PlanificationPage() {
   const [activeTab, setActiveTab] = useState("liste");
   const [activeKpi, setActiveKpi] = useState('ALL');
   
-  // Create Modal
+  // Create/Edit Modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editData, setEditData] = useState(null);
+
+  // Dropdown & Delete State
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null });
+  const [actionError, setActionError] = useState("");
+
+  const handleEditClick = (e, row) => {
+    e.stopPropagation();
+    setOpenDropdown(null);
+    setEditData(row);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleDeleteClick = (e, id) => {
+    e.stopPropagation();
+    setOpenDropdown(null);
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setActionError("");
+      await deletePlanification(deleteModal.id);
+      setDeleteModal({ isOpen: false, id: null });
+      fetchAll();
+    } catch (err) {
+      setActionError(err.response?.data?.error || err.message || "Erreur de suppression.");
+    }
+  };
 
   const fetchAll = useCallback(async () => {
     try {
@@ -61,7 +92,13 @@ export default function PlanificationPage() {
         loadDashboardStats()
       ]);
       setData(planData.data || []);
-      if (planData.meta) setMeta(prev => ({ ...prev, total: planData.meta.total }));
+      if (planData.meta) {
+        setMeta(prev => ({ 
+          ...prev, 
+          total: planData.meta.total,
+          totalPages: planData.meta.totalPages
+        }));
+      }
       setStats(dashStats);
     } catch (err) {
       console.error(err);
@@ -169,6 +206,57 @@ export default function PlanificationPage() {
           </div>
         </div>
       )
+    },
+    {
+      header: "Actions",
+      align: "right",
+      cell: (row) => (
+        <div className="relative flex justify-end">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenDropdown(openDropdown === row.id ? null : row.id);
+            }} 
+            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+          
+          <AnimatePresence>
+            {openDropdown === row.id && (
+              <>
+                <motion.div 
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  exit={{ opacity: 0 }} 
+                  className="fixed inset-0 z-10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenDropdown(null);
+                  }}
+                />
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }} 
+                  animate={{ opacity: 1, scale: 1, y: 0 }} 
+                  exit={{ opacity: 0, scale: 0.95, y: -10 }} 
+                  className="absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 shadow-lg rounded-xl z-20 py-1 overflow-hidden"
+                >
+                  <button onClick={(e) => { e.stopPropagation(); router.push(`/planification/${row.id}`); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-colors">
+                    <Eye className="w-4 h-4" /> Voir
+                  </button>
+                  <button onClick={(e) => handleEditClick(e, row)} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-amber-600 transition-colors">
+                    <Edit className="w-4 h-4" /> Modifier
+                  </button>
+                  <div className="h-px bg-slate-100 my-1" />
+                  <button onClick={(e) => handleDeleteClick(e, row.id)} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 transition-colors">
+                    <Trash2 className="w-4 h-4" /> Supprimer
+                  </button>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
+      )
     }
   ];
 
@@ -204,7 +292,7 @@ export default function PlanificationPage() {
               </button>
             </div>
             <button
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => { setEditData(null); setIsCreateModalOpen(true); }}
               className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl shadow-sm hover:bg-blue-700 hover:shadow transition-all flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
@@ -238,37 +326,42 @@ export default function PlanificationPage() {
                 users={users} 
               />
 
-              {/* Data Table */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <DataTable
-                  columns={columns}
-                  data={data}
-                  loading={loading}
-                  onRowClick={(row) => router.push(`/planification/${row.id}`)}
-                />
-                
-                {/* Simple Pagination */}
-                {meta.totalPages > 1 && (
-                  <div className="p-4 border-t border-slate-200 flex justify-between items-center bg-slate-50">
-                    <span className="text-sm text-slate-500 font-medium">
-                      Page {meta.page} sur {meta.totalPages} ({meta.total} résultats)
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        disabled={meta.page === 1}
-                        onClick={() => setMeta(prev => ({ ...prev, page: prev.page - 1 }))}
-                        className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
-                      >
-                        Précédent
-                      </button>
-                      <button
-                        disabled={meta.page === meta.totalPages}
-                        onClick={() => setMeta(prev => ({ ...prev, page: prev.page + 1 }))}
-                        className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
-                      >
-                        Suivant
-                      </button>
-                    </div>
+              {/* Data Table Area */}
+              <div className="mt-4">
+                {loading && data.length === 0 ? (
+                   <div className="p-8 text-center space-y-4">
+                     <div className="w-8 h-8 mx-auto border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                     <p className="text-slate-500 text-sm">Chargement des planifications...</p>
+                   </div>
+                ) : data.length === 0 ? (
+                   <div className="p-12 bg-white rounded-2xl border border-slate-200 shadow-sm text-center flex flex-col items-center">
+                     <div className="w-16 h-16 bg-slate-100 text-slate-300 rounded-full flex items-center justify-center mb-4">
+                       <BarChart2 className="w-8 h-8" />
+                     </div>
+                     <h3 className="text-lg font-bold text-slate-700 mb-1">Aucune planification</h3>
+                     <p className="text-slate-500 text-sm max-w-sm mb-6">Nous n'avons trouvé aucune planification correspondant à vos critères de recherche.</p>
+                     <button
+                        onClick={() => handleFilterChange({search: '', bom_id: '', matricule_gl: '', matricule_superviseur: '', date_debut: '', date_fin: '', status: ''})}
+                        className="text-blue-600 bg-blue-50 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-100 transition-colors"
+                     >
+                       Réinitialiser les filtres
+                     </button>
+                   </div>
+                ) : (
+                  <div className="space-y-4">
+                    <DataTable
+                      columns={columns}
+                      data={data}
+                      loading={loading}
+                      onRowClick={(row) => router.push(`/planification/${row.id}`)}
+                      pagination={{
+                        page: meta.page,
+                        limit: meta.limit,
+                        total: meta.total,
+                        totalPages: meta.totalPages
+                      }}
+                      onPageChange={(newPage) => setMeta(prev => ({ ...prev, page: newPage }))}
+                    />
                   </div>
                 )}
               </div>
@@ -295,15 +388,48 @@ export default function PlanificationPage() {
       {/* Placeholder for Wizard (we'll implement this next) */}
       <PlanificationForm 
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
+        onClose={() => { setIsCreateModalOpen(false); setEditData(null); }}
         onSubmit={async () => {
           setIsCreateModalOpen(false);
+          setEditData(null);
           fetchAll();
         }}
-        initialData={null}
+        initialData={editData}
         boms={boms}
         users={users}
       />
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setDeleteModal({ isOpen: false, id: null })} />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 overflow-hidden">
+              <div className="p-6">
+                <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Supprimer la planification ?</h3>
+                <p className="text-sm text-slate-500 mb-6">Cette action supprimera définitivement la planification. Si des panneaux ou un historique sont liés, la suppression sera bloquée pour préserver l'intégrité des données.</p>
+                
+                {actionError && (
+                  <div className="mb-6 p-3 bg-rose-50 border border-rose-200 rounded-xl flex gap-3 text-rose-700 text-sm font-medium">
+                    <AlertCircle className="w-5 h-5 shrink-0" />
+                    <p>{actionError}</p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 justify-end">
+                  <button onClick={() => { setDeleteModal({ isOpen: false, id: null }); setActionError(""); }} className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">Annuler</button>
+                  <button onClick={confirmDelete} className="px-4 py-2 font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-colors flex items-center gap-2">
+                    <Trash2 className="w-4 h-4" /> Supprimer
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

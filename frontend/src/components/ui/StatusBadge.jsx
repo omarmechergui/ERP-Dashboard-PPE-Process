@@ -1,44 +1,61 @@
 import React from 'react';
 
 const STATUS_CONFIG = {
-  SUCCESS: { icon: '✓', colors: 'text-success bg-success/10 border-success/20' },
-  WARNING: { icon: '!', colors: 'text-warning bg-warning/10 border-warning/20' },
-  DANGER: { icon: '×', colors: 'text-danger bg-danger/10 border-danger/20' },
-  INFO: { icon: '●', colors: 'text-info bg-info/10 border-info/20' },
-  NEUTRAL: { icon: '○', colors: 'text-neutral bg-neutral/10 border-neutral/20' },
-  PLANIFIEE: { icon: '○', colors: 'text-blue-700 bg-blue-100 border-blue-200' },
+  // Explicit Planification Statuses
+  BROUILLON: { icon: '○', colors: 'text-slate-700 bg-slate-100 border-slate-200' },
+  PLANIFIEE: { icon: '📅', colors: 'text-blue-700 bg-blue-100 border-blue-200' },
+  EN_PRODUCTION: { icon: '⚙️', colors: 'text-amber-700 bg-amber-100 border-amber-200' },
+  TERMINEE: { icon: '✓', colors: 'text-emerald-700 bg-emerald-100 border-emerald-200' },
   ANNULEE: { icon: '×', colors: 'text-rose-700 bg-rose-100 border-rose-200' },
+
+  // Panneaux/Construction Statuses
+  EN_CONSTRUCTION: { icon: '🔨', colors: 'text-amber-700 bg-amber-100 border-amber-200' },
+  EN_VALIDATION: { icon: '🔍', colors: 'text-blue-700 bg-blue-100 border-blue-200' },
+  TERMINE: { icon: '✓', colors: 'text-emerald-700 bg-emerald-100 border-emerald-200' },
+
+  // Fallbacks
+  SUCCESS: { icon: '✓', colors: 'text-emerald-700 bg-emerald-100 border-emerald-200' },
+  WARNING: { icon: '!', colors: 'text-amber-700 bg-amber-100 border-amber-200' },
+  DANGER: { icon: '×', colors: 'text-rose-700 bg-rose-100 border-rose-200' },
+  INFO: { icon: '●', colors: 'text-blue-700 bg-blue-100 border-blue-200' },
+  NEUTRAL: { icon: '○', colors: 'text-slate-700 bg-slate-100 border-slate-200' },
 };
 
-export default function StatusBadge({ status, label }) {
-  // Infer configuration from common keywords if no explicit status is provided
+export default function StatusBadge({ status, label, className = '' }) {
   let configKey = 'NEUTRAL';
-  const labelLower = (label || '').toLowerCase();
-  const statusLower = (status || '').toLowerCase();
-  
-  const strToMatch = labelLower || statusLower;
-
-  if (['réussi', 'terminée', 'conforme', 'validée', 'active', 'termine', 'success', 'done'].includes(strToMatch) || strToMatch.includes('termin')) {
-    configKey = 'SUCCESS';
-  } else if (['à venir', 'en attente', 'planifiée', 'attention', 'warning', 'pending', 'planned'].includes(strToMatch)) {
-    configKey = 'WARNING';
-  } else if (['échec', 'en retard', 'annulée', 'non conforme', 'danger', 'failed', 'cancelled', 'retard'].includes(strToMatch)) {
-    configKey = 'DANGER';
-  } else if (['en cours', 'en validation', 'info', 'progress', 'khm'].includes(strToMatch)) {
-    configKey = 'INFO';
-  }
+  let displayLabel = label || status || 'Inconnu';
 
   // Explicit override via status prop if it matches our keys
   if (status && STATUS_CONFIG[status.toUpperCase()]) {
     configKey = status.toUpperCase();
+    if (!label) {
+       // Format explicitly mapped statuses well
+       if (status === 'EN_PRODUCTION') displayLabel = 'En Production';
+       else if (status === 'EN_CONSTRUCTION') displayLabel = 'En Construction';
+       else if (status === 'EN_VALIDATION') displayLabel = 'En Validation';
+       else if (status === 'TERMINEE' || status === 'TERMINE') displayLabel = 'Terminé';
+       else displayLabel = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    }
+  } else {
+    // Fallback logic for dynamic words
+    const strToMatch = (label || status || '').toLowerCase();
+    
+    if (['réussi', 'terminée', 'conforme', 'validée', 'active', 'termine', 'success', 'done'].includes(strToMatch) || strToMatch.includes('termin')) {
+      configKey = 'SUCCESS';
+    } else if (['à venir', 'en attente', 'planifiée', 'attention', 'warning', 'pending', 'planned'].includes(strToMatch)) {
+      configKey = 'WARNING';
+    } else if (['échec', 'en retard', 'annulée', 'non conforme', 'danger', 'failed', 'cancelled', 'retard'].includes(strToMatch)) {
+      configKey = 'DANGER';
+    } else if (['en cours', 'en validation', 'info', 'progress', 'khm'].includes(strToMatch)) {
+      configKey = 'INFO';
+    }
   }
 
-  const { icon, colors } = STATUS_CONFIG[configKey];
-  const displayLabel = label || status;
+  const { icon, colors } = STATUS_CONFIG[configKey] || STATUS_CONFIG.NEUTRAL;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${colors}`}>
-      <span>{icon}</span>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${colors} ${className}`}>
+      <span className="text-[10px]">{icon}</span>
       {displayLabel}
     </span>
   );

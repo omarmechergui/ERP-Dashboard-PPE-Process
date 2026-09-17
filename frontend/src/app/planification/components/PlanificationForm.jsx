@@ -1,17 +1,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Calendar, User, FileText, CheckCircle2, ChevronRight, ChevronLeft, Package, Clock, Loader2, Plus, Trash2, Settings, ClipboardList } from "lucide-react";
+import { X, Calendar, User, FileText, CheckCircle2, ChevronRight, ChevronLeft, Package, Clock, Loader2, Plus, Trash2, Settings, ClipboardList, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlanification } from "../hooks/usePlanification";
 import { format } from "date-fns";
 
-export default function PlanificationForm({ isOpen, onClose, onSubmit, boms = [], users = { gls: [], superviseurs: [] } }) {
-  const { createPlanification } = usePlanification();
+export default function PlanificationForm({ isOpen, onClose, onSubmit, initialData = null, boms = [], users = { gls: [], superviseurs: [] } }) {
+  const { createPlanification, updatePlanification, searchPanneaux } = usePlanification();
   
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -27,31 +30,88 @@ export default function PlanificationForm({ isOpen, onClose, onSubmit, boms = []
     matricule_gl: "",
     matricule_superviseur: "",
     panneaux: [],
-    actions: []
+    actions: [],
+    progress: 0
   });
 
   useEffect(() => {
     if (isOpen) {
       setStep(1);
       setError("");
-      setFormData({
-        title: "",
-        project: "",
-        customer: "",
-        description: "",
-        priority: "NORMAL",
-        date_debut: "",
-        date_fin: "",
-        bom_id: "",
-        quantite: "",
-        production_mode: "",
-        matricule_gl: users.gls?.[0]?.matricule || "",
-        matricule_superviseur: users.superviseurs?.[0]?.matricule || "",
-        panneaux: [],
-        actions: []
-      });
+      setSearchQuery("");
+      setSearchResults([]);
+      if (initialData) {
+        setFormData({
+          title: initialData.title || "",
+          project: initialData.project || "",
+          customer: initialData.customer || "",
+          description: initialData.description || "",
+          priority: initialData.priority || "NORMAL",
+          date_debut: initialData.date_debut ? format(new Date(initialData.date_debut), 'yyyy-MM-dd') : "",
+          date_fin: initialData.date_fin ? format(new Date(initialData.date_fin), 'yyyy-MM-dd') : "",
+          bom_id: initialData.bom_id || "",
+          quantite: initialData.quantite || "",
+          production_mode: initialData.production_mode || "",
+          matricule_gl: initialData.matricule_gl || "",
+          matricule_superviseur: initialData.matricule_superviseur || "",
+          panneaux: initialData.panneaux || [],
+          actions: initialData.actions || [],
+          progress: initialData.progress || 0
+        });
+      } else {
+        setFormData({
+          title: "",
+          project: "",
+          customer: "",
+          description: "",
+          priority: "NORMAL",
+          date_debut: "",
+          date_fin: "",
+          bom_id: "",
+          quantite: "",
+          production_mode: "",
+          matricule_gl: "",
+          matricule_superviseur: "",
+          panneaux: [],
+          actions: [],
+          progress: 0
+        });
+      }
+    }
+  }, [isOpen, initialData]);
+
+  useEffect(() => {
+    if (isOpen && users) {
+      setFormData(prev => ({
+        ...prev,
+        matricule_gl: prev.matricule_gl || users.gls?.[0]?.matricule || "",
+        matricule_superviseur: prev.matricule_superviseur || users.superviseurs?.[0]?.matricule || ""
+      }));
     }
   }, [isOpen, users]);
+
+  useEffect(() => {
+    if (formData.production_mode === "FIX") {
+      const abortController = new AbortController();
+      const fetchPanneaux = async () => {
+        setIsSearching(true);
+        try {
+          const results = await searchPanneaux(searchQuery, abortController.signal);
+          const selectedIds = formData.panneaux.map(p => p.id);
+          setSearchResults((results || []).filter(p => !selectedIds.includes(p.id)));
+        } catch (err) {
+          // handled in hook
+        } finally {
+          setIsSearching(false);
+        }
+      };
+      const timeoutId = setTimeout(fetchPanneaux, 300);
+      return () => {
+        clearTimeout(timeoutId);
+        abortController.abort();
+      };
+    }
+  }, [searchQuery, formData.production_mode, formData.panneaux, searchPanneaux]);
 
   if (!isOpen) return null;
 
@@ -111,13 +171,20 @@ export default function PlanificationForm({ isOpen, onClose, onSubmit, boms = []
         date_debut: new Date(formData.date_debut).toISOString(),
         date_fin: new Date(formData.date_fin).toISOString(),
         quantite: formData.quantite === "" ? null : Number(formData.quantite),
-        production_mode: formData.production_mode === "" ? null : formData.production_mode,
-        bom_id: formData.production_mode === "BOM" ? formData.bom_id : null
+        production_mode: formData.production_mode === "" ? "AUCUNE" : formData.production_mode,
+        bom_id: formData.production_mode === "BOM" ? formData.bom_id : null,
+        progress: formData.progress === "" ? 0 : Number(formData.progress)
       };
-      await createPlanification(payload);
+      
+      if (initialData && initialData.id) {
+        await updatePlanification(initialData.id, payload);
+      } else {
+        await createPlanification(payload);
+      }
+      
       onSubmit();
     } catch (err) {
-      setError(err.response?.data?.error || "Une erreur est survenue lors de la création.");
+      setError(err.response?.data?.error || "Une erreur est survenue.");
     } finally {
       setLoading(false);
     }
@@ -254,7 +321,7 @@ export default function PlanificationForm({ isOpen, onClose, onSubmit, boms = []
                   </div>
                   <div className="col-span-2 space-y-2">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Description (Optionnelle)</label>
-                    <textarea name="description" value={formData.description} onChange={handleChange} rows={2} placeholder="Ajoutez des notes ou instructions spécifiques..." className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all resize-none" />
+                    <textarea name="description" value={formData.description || ''} onChange={handleChange} rows={2} placeholder="Ajoutez des notes ou instructions spécifiques..." className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all resize-none" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><User className="w-4 h-4" /> Group Leader <span className="text-rose-500">*</span></label>
@@ -290,11 +357,11 @@ export default function PlanificationForm({ isOpen, onClose, onSubmit, boms = []
                       <div 
                         key={mode.id}
                         onClick={() => {
-                          setFormData(prev => ({ ...prev, production_mode: mode.id }));
+                          setFormData(prev => ({ ...prev, production_mode: mode.id === "AUCUNE" ? "" : mode.id }));
                           setError("");
                         }}
                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center text-center gap-2 ${
-                          formData.production_mode === mode.id 
+                          (formData.production_mode === mode.id) || (formData.production_mode === "AUCUNE" && mode.id === "")
                             ? 'border-blue-500 bg-blue-50 text-blue-700' 
                             : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50 text-slate-600'
                         }`}
@@ -351,28 +418,40 @@ export default function PlanificationForm({ isOpen, onClose, onSubmit, boms = []
                       
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Panneaux <span className="text-rose-500">*</span></label>
-                          <button onClick={addPanneau} className="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1.5">
-                            <Plus className="w-3.5 h-3.5" /> Ajouter un panneau
-                          </button>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                            Panneaux Sélectionnés
+                            <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{formData.panneaux.length}</span>
+                          </label>
+                          {formData.production_mode === "MANUEL" && (
+                            <button onClick={addPanneau} className="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1.5">
+                              <Plus className="w-3.5 h-3.5" /> Ajouter un panneau
+                            </button>
+                          )}
                         </div>
                         
                         {formData.panneaux.length === 0 ? (
                           <div className="text-center py-8 bg-white rounded-xl border border-dashed border-slate-300">
-                            <p className="text-sm text-slate-500">Aucun panneau défini. Un panneau est requis.</p>
+                            <p className="text-sm text-slate-500">Aucun panneau sélectionné.</p>
                           </div>
                         ) : (
                           <div className="space-y-2">
                             {formData.panneaux.map((panneau, i) => (
                               <div key={i} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-slate-200">
                                 <span className="w-6 h-6 rounded bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
-                                <input 
-                                  type="text" 
-                                  value={panneau.title_panneau} 
-                                  onChange={(e) => updatePanneau(i, e.target.value)}
-                                  className="flex-1 px-3 py-2 bg-transparent text-sm font-medium focus:outline-none"
-                                  placeholder="Référence / Nom du panneau"
-                                />
+                                {panneau.id ? (
+                                  <div className="flex-1 px-2">
+                                     <p className="text-sm font-bold text-slate-800">{panneau.title_panneau}</p>
+                                     <p className="text-[10px] text-slate-400 font-mono mt-0.5">{panneau.id}</p>
+                                  </div>
+                                ) : (
+                                  <input 
+                                    type="text" 
+                                    value={panneau.title_panneau} 
+                                    onChange={(e) => updatePanneau(i, e.target.value)}
+                                    className="flex-1 px-3 py-2 bg-transparent text-sm font-medium focus:outline-none"
+                                    placeholder="Référence / Nom du panneau"
+                                  />
+                                )}
                                 <button onClick={() => removePanneau(i)} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -384,11 +463,119 @@ export default function PlanificationForm({ isOpen, onClose, onSubmit, boms = []
                     </div>
                   )}
 
-                  {formData.production_mode === "" && (
-                     <div className="text-center py-12">
-                       <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                       <p className="text-slate-600 font-medium">Brouillon initial</p>
-                       <p className="text-sm text-slate-400 mt-1">La planification sera créée sans données de production. Vous pourrez définir le mode plus tard.</p>
+                  {formData.production_mode === "FIX" && (
+                     <div className="mt-6 p-5 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                          <Search className="w-4 h-4" /> Rechercher des panneaux existants
+                        </label>
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Rechercher par ID ou titre..."
+                            className="w-full pl-4 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all"
+                          />
+                          {isSearching && (
+                             <Loader2 className="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />
+                          )}
+                        </div>
+                        
+                        <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+                          {searchResults.length > 0 ? (
+                            searchResults.map(panneau => (
+                              <div key={panneau.id} onClick={() => {
+                                setFormData(prev => ({ ...prev, panneaux: [...prev.panneaux, panneau] }));
+                              }} className="p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-blue-50 hover:border-blue-300 flex justify-between items-center transition-colors group">
+                                <div>
+                                  <p className="font-bold text-sm text-slate-800 group-hover:text-blue-700 transition-colors">{panneau.title_panneau}</p>
+                                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">{panneau.id}</p>
+                                </div>
+                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                                  <Plus className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            !isSearching && (
+                              <div className="text-center py-6 text-slate-400">
+                                <p className="text-sm font-medium">Aucun panneau trouvé</p>
+                                <p className="text-xs mt-1">Modifiez votre recherche</p>
+                              </div>
+                            )
+                          )}
+                        </div>
+                     </div>
+                  )}
+
+                  {(formData.production_mode === "" || formData.production_mode === "AUCUNE") && (
+                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+                         
+                         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
+                           <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+                           <div>
+                             <h4 className="font-bold text-emerald-800 text-sm">Production sans BOM</h4>
+                             <p className="text-xs text-emerald-600 mt-1">Cette planification ne nécessite aucune BOM ni composants spécifiques.</p>
+                           </div>
+                         </div>
+
+                         <div className="space-y-3">
+                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quantité à produire (Optionnelle)</label>
+                           <div className="flex items-center gap-3">
+                             <button type="button" onClick={() => setFormData(prev => ({ ...prev, quantite: Math.max(0, (prev.quantite || 0) - 1) }))} className="w-10 h-10 flex items-center justify-center bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors font-bold text-lg">
+                               −
+                             </button>
+                             <input 
+                               type="number" 
+                               name="quantite" 
+                               min="0" 
+                               value={formData.quantite === "" ? 0 : formData.quantite} 
+                               onChange={(e) => {
+                                  const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                                  setFormData(prev => ({ ...prev, quantite: Math.max(0, val) }));
+                               }}
+                               className="w-24 text-center px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                             />
+                             <button type="button" onClick={() => setFormData(prev => ({ ...prev, quantite: (prev.quantite || 0) + 1 }))} className="w-10 h-10 flex items-center justify-center bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors font-bold text-lg">
+                               +
+                             </button>
+                           </div>
+                         </div>
+                         
+                         <div className="space-y-2">
+                           <div className="flex justify-between items-end">
+                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Description / Action <span className="text-rose-500">*</span></label>
+                             <span className="text-[10px] text-slate-400 font-mono">{formData.description?.length || 0} / 500 caractères</span>
+                           </div>
+                           <textarea 
+                             name="description" 
+                             value={formData.description || ''} 
+                             onChange={(e) => {
+                               if (e.target.value.length <= 500) {
+                                 handleChange(e);
+                               }
+                             }} 
+                             rows={4} 
+                             placeholder="Décrire l'action ou le travail à réaliser..." 
+                             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all resize-none" 
+                           />
+                         </div>
+
+                         <div className="space-y-2">
+                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Progression initiale (%)</label>
+                           <input 
+                             type="number" 
+                             name="progress" 
+                             min="0" 
+                             max="100" 
+                             value={formData.progress === null ? 0 : formData.progress} 
+                             onChange={handleChange} 
+                             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all" 
+                           />
+                         </div>
+
+                       </div>
                      </div>
                   )}
                 </div>
@@ -533,15 +720,34 @@ export default function PlanificationForm({ isOpen, onClose, onSubmit, boms = []
                       <p className="font-bold text-blue-600 text-base">
                         {formData.production_mode === 'BOM' ? 'BOM' : 
                          formData.production_mode === 'FIX' ? 'Fix' : 
-                         formData.production_mode === 'MANUEL' ? 'Manuelle' : 'Non défini (Brouillon)'}
+                         formData.production_mode === 'MANUEL' ? 'Manuelle' : 'AUCUNE'}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-1">Quantité à produire</p>
-                      <p className="font-bold text-slate-800 text-base">{formData.quantite || '—'}</p>
-                    </div>
+                    
+                    {(formData.production_mode === "" || formData.production_mode === "AUCUNE") ? (
+                      <>
+                        <div className="col-span-1">
+                          <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-1">Quantité à produire</p>
+                          <p className="font-bold text-slate-800 text-base">{formData.quantite || 0}</p>
+                        </div>
+                        <div className="col-span-1">
+                          <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-1">Progression</p>
+                          <p className="font-bold text-slate-800 text-base">{formData.progress || 0}%</p>
+                        </div>
+                        <div className="col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                          <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-2">Description / Action</p>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap">{formData.description || "—"}</p>
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-1">Quantité à produire</p>
+                        <p className="font-bold text-slate-800 text-base">{formData.quantite || '—'}</p>
+                      </div>
+                    )}
 
-                    <div className="col-span-2 grid grid-cols-3 gap-4">
+                    {formData.production_mode !== "" && formData.production_mode !== "AUCUNE" && (
+                      <div className="col-span-2 grid grid-cols-3 gap-4">
                       <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
                         <p className="text-xl font-black text-slate-700">{formData.production_mode === 'BOM' ? 'Auto' : formData.panneaux.length}</p>
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">Panneaux</p>
@@ -555,6 +761,7 @@ export default function PlanificationForm({ isOpen, onClose, onSubmit, boms = []
                         <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider mt-1">Checklists</p>
                       </div>
                     </div>
+                    )}
 
                     <div className="col-span-2 border-t border-slate-100" />
 
