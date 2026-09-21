@@ -78,7 +78,6 @@ const register = async (req, res, next) => {
       email: z.string().email('Email invalide'),
       matricule: z.string().min(1, 'Le matricule est requis'),
       mot_de_passe: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
-      role: z.enum(['ADMIN', 'MANAGER', 'GL', 'TL', 'SUPERVISEUR', 'DESIGNER', 'TECHNICIEN', 'TECHNICIENSTOCK', 'OPERATEUR']).optional().default('OPERATEUR'),
     });
 
     const validation = registerSchema.safeParse(req.body);
@@ -86,7 +85,7 @@ const register = async (req, res, next) => {
       return res.status(400).json({ error: validation.error.errors[0].message });
     }
 
-    const { nom, email, matricule, mot_de_passe, role } = validation.data;
+    const { nom, email, matricule, mot_de_passe } = validation.data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findFirst({
@@ -112,7 +111,7 @@ const register = async (req, res, next) => {
         email,
         matricule,
         mot_de_passe: hashedPassword,
-        role: role || 'OPERATEUR',
+        role: 'OPERATEUR',
         statut: 'ACTIF',
       },
     });

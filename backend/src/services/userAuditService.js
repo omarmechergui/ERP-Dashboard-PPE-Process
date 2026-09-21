@@ -52,7 +52,7 @@ async function logUserDelete(actorId, userId, userData, prisma) {
   await prisma.userAuditLog.create({
     data: {
       actorId,
-      userId: null, // User will be deleted, so we don't link it strictly to avoid FK constraint issues if using hard delete. If soft delete, this can stay linked.
+      userId: userId, // Preserve the link for soft deletes
       action: 'DELETE',
       changes: JSON.stringify({
         deletedUser: {

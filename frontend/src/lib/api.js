@@ -43,14 +43,18 @@ API.interceptors.response.use(
       return Promise.reject(new Error("Session expirée, veuillez vous reconnecter."));
     }
 
-    // Log genuine errors for debugging
-    console.error("API Error intercepted:", JSON.stringify({
-      message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      data: error.response?.data,
-      url: error.config?.url
-    }, null, 2));
+    // Log genuine errors for debugging (use warn to avoid Next.js dev overlay for 4xx)
+    if (error.response?.status >= 500 || !error.response) {
+      console.error("API Error intercepted:", JSON.stringify({
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        data: error.response?.data,
+        url: error.config?.url
+      }, null, 2));
+    } else {
+      console.warn("API Warning intercepted:", error.response?.data?.message || error.message);
+    }
 
     // Enrich error.message with server-provided text for backward compatibility,
     // while preserving the full Axios error object (response, status, etc.)

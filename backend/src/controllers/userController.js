@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const { z } = require('zod');
 const prisma = require('../config/db');
 const { AppError } = require('../helpers/AppError');
-const { validateManagerAssignment } = require('../services/userHierarchy');
+const { validateManagerAssignment, VALID_SUBORDINATE_ROLES } = require('../services/userHierarchy');
 const { logUserCreate, logUserUpdate, logUserDelete } = require('../services/userAuditService');
 
 const createUserSchema = z.object({
@@ -225,12 +225,31 @@ const updateUser = async (req, res, next) => {
       delete updateData.mot_de_passe; // Remove empty password fields
     }
 
-    // Manager validation
-    if (updateData.managerId !== undefined) {
-      const newManagerId = updateData.managerId;
-      const targetRole = updateData.role || existingUser.role;
+    const targetRole = updateData.role || existingUser.role;
+    const targetManagerId = updateData.managerId !== undefined ? updateData.managerId : existingUser.managerId;
 
-      await validateManagerAssignment(existingUser.id, newManagerId, targetRole, prisma);
+    // Manager validation: always re-validate if role or manager changes
+    if (updateData.role || updateData.managerId !== undefined) {
+      await validateManagerAssignment(existingUser.id, targetManagerId, targetRole, prisma);
+    }
+
+    // Subordinates validation: if role changes, check if existing active subordinates remain valid
+    if (updateData.role && updateData.role !== existingUser.role) {
+      const activeSubordinates = await prisma.user.findMany({
+        where: { managerId: existingUser.id, statut: 'ACTIF' }
+      });
+      
+      if (activeSubordinates.length > 0) {
+        const allowedSubordinateRoles = VALID_SUBORDINATE_ROLES[targetRole] || [];
+        const invalidSubordinates = activeSubordinates.filter(sub => !allowedSubordinateRoles.includes(sub.role));
+        
+        if (invalidSubordinates.length > 0) {
+          throw new AppError(
+            `Le nouveau rôle ${targetRole} ne permet pas de gérer certains des subordonnés actuels (${invalidSubordinates.map(u => u.nom).join(', ')}). Veuillez les réassigner d'abord.`,
+            400, 'INVALID_SUBORDINATES'
+          );
+        }
+      }
     }
 
     const updatedUser = await prisma.user.update({
@@ -281,8 +300,9 @@ const deleteUser = async (req, res, next) => {
       throw new AppError("Vous ne pouvez pas supprimer ou désactiver votre propre compte", 400, 'SELF_DELETE');
     }
 
-    if (existingUser.subordinates && existingUser.subordinates.length > 0) {
-      throw new AppError("Cet utilisateur a des subordonnés. Veuillez les réassigner avant de le supprimer.", 400, 'HAS_SUBORDINATES');
+    const activeSubordinates = existingUser.subordinates ? existingUser.subordinates.filter(sub => sub.statut === 'ACTIF') : [];
+    if (activeSubordinates.length > 0) {
+      throw new AppError("Cet utilisateur a des subordonnés actifs. Veuillez les réassigner avant de le désactiver.", 400, 'HAS_SUBORDINATES');
     }
 
     // Soft delete

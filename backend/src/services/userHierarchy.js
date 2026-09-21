@@ -7,17 +7,34 @@ const { AppError } = require('../helpers/AppError');
 /**
  * For each user role, which manager roles are allowed.
  * Empty array = no manager allowed (root role).
+ * STRICT ONE-LEVEL: each role may only have its IMMEDIATE superior.
  */
 const VALID_MANAGER_ROLES = {
-  ADMIN:          [],
-  MANAGER:        ['ADMIN'],
-  GL:             ['MANAGER', 'ADMIN'],
-  TL:             ['GL', 'MANAGER', 'ADMIN'],
-  SUPERVISEUR:    ['TL', 'GL', 'MANAGER', 'ADMIN'],
-  DESIGNER:       ['TL', 'GL', 'MANAGER', 'ADMIN'],
-  TECHNICIEN:     ['SUPERVISEUR', 'TL', 'GL', 'MANAGER', 'ADMIN'],
-  TECHNICIENSTOCK:['SUPERVISEUR', 'TL', 'GL', 'MANAGER', 'ADMIN'],
-  OPERATEUR:      ['SUPERVISEUR', 'TL', 'GL', 'MANAGER', 'ADMIN'],
+  ADMIN:          [],              // Root — no manager
+  MANAGER:        ['ADMIN'],       // MANAGER → ADMIN
+  GL:             ['MANAGER'],     // GL → MANAGER
+  TL:             ['GL'],          // TL → GL
+  SUPERVISEUR:    ['TL'],          // SUPERVISEUR → TL
+  DESIGNER:       ['GL'],          // DESIGNER → GL
+  TECHNICIEN:     ['SUPERVISEUR'], // TECHNICIEN → SUPERVISEUR
+  TECHNICIENSTOCK:['SUPERVISEUR'], // TECHNICIENSTOCK → SUPERVISEUR
+  OPERATEUR:      ['SUPERVISEUR'], // OPERATEUR → SUPERVISEUR
+};
+
+/**
+ * Reverse mapping: for each role, which subordinate roles are valid.
+ * Used to validate that existing subordinates remain valid after a role change.
+ */
+const VALID_SUBORDINATE_ROLES = {
+  ADMIN:          ['MANAGER'],
+  MANAGER:        ['GL'],
+  GL:             ['TL', 'DESIGNER'],
+  TL:             ['SUPERVISEUR'],
+  SUPERVISEUR:    ['TECHNICIEN', 'TECHNICIENSTOCK', 'OPERATEUR'],
+  DESIGNER:       [],
+  TECHNICIEN:     [],
+  TECHNICIENSTOCK:[],
+  OPERATEUR:      [],
 };
 
 /**
@@ -80,8 +97,17 @@ async function checkCircularReference(userId, newManagerId, prisma) {
 }
 
 async function validateManagerAssignment(userId, managerId, targetRole, prisma) {
-  if (managerId === null || managerId === undefined || managerId === '') {
-    return; // Manager is optional
+  const isManagerMissing = managerId === null || managerId === undefined || managerId === '';
+
+  if (isManagerMissing) {
+    if (targetRole === 'ADMIN') {
+      return; // ADMIN is allowed to have no manager
+    } else {
+      throw new AppError(
+        `Un utilisateur avec le rôle ${targetRole} doit obligatoirement avoir un responsable.`,
+        400, 'MISSING_MANAGER'
+      );
+    }
   }
   
   const safeManagerId = String(managerId);
@@ -153,6 +179,7 @@ async function validateManagerAssignment(userId, managerId, targetRole, prisma) 
 
 module.exports = {
   VALID_MANAGER_ROLES,
+  VALID_SUBORDINATE_ROLES,
   VALID_ROLES,
   VALID_STATUTS,
   ROLE_LEVEL,

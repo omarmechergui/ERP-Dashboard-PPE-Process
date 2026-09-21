@@ -126,6 +126,59 @@ npm test
 | `npm run prisma:seed`      | Seed the database with sample data        |
 | `npm run use-sqlite`       | Switch local setup to SQLite              |
 
-## License
+## Backup Strategy
 
-No license file is currently included in this repository. Add one (e.g. MIT) if you intend to distribute or open-source this project.
+### MongoDB Backup
+Recommended production strategy:
+- Scheduled MongoDB backups.
+- Retention policy configured based on business needs.
+- Encrypted backup storage.
+- Periodic restore verification.
+(Note: Backup configuration depends heavily on the chosen MongoDB hosting provider such as MongoDB Atlas).
+
+## Restore Procedure
+
+1. Stop affected application services if necessary.
+2. Identify the correct backup.
+3. Restore into the target MongoDB environment.
+4. Verify database integrity.
+5. Verify Prisma/application connectivity.
+6. Start backend.
+7. Run health check.
+8. Perform smoke tests.
+
+## Rollback Strategy
+
+1. Identify previous stable release.
+2. Stop/deploy previous application version.
+3. Restore compatible environment variables.
+4. Verify database compatibility (Note: Database rollback is not automatically safe and may require a compatible migration/backup strategy).
+5. Start backend/frontend.
+6. Check `/health`.
+7. Perform critical smoke tests.
+
+## Known Limitations
+
+- MongoDB Replica Set required for transactional runtime testing.
+- E2E automation not implemented.
+- OpenAPI/Swagger not implemented.
+- React Query not implemented.
+- Matricule → immutable ID migration deferred.
+
+## Release Information
+
+**ERP/MES Release Readiness**
+
+**Status:** Code Verified / Runtime Blocked
+
+**Completed:**
+- P0 Security
+- P1 Business Logic
+- P2 Performance & Architecture
+- P3 Quality & Production Readiness
+
+**Known runtime limitation:**
+MongoDB Replica Set required for transactional testing.
+
+**Deployment prerequisite:**
+Production MongoDB deployment must support transactions.

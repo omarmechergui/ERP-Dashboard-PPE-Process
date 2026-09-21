@@ -23,11 +23,11 @@ const VALID_STATUTS = ['ACTIF', 'INACTIF'];
 // ============================================================
 const VALID_MANAGER_ROLES = {
   ADMIN:          [],
-  MANAGER:        [],
-  GL:             ['MANAGER', 'ADMIN'],
+  MANAGER:        ['ADMIN'],
+  GL:             ['MANAGER'],
   TL:             ['GL'],
   SUPERVISEUR:    ['TL'],
-  DESIGNER:       ['TL'],
+  DESIGNER:       ['GL'],
   TECHNICIEN:     ['SUPERVISEUR'],
   TECHNICIENSTOCK:['SUPERVISEUR'],
   OPERATEUR:      ['SUPERVISEUR'],
@@ -209,7 +209,11 @@ export default function UtilisateursPage() {
       loadUsers();
       loadManagers();
     } catch (err) {
-      console.error(err);
+      if (err.response?.status >= 500 || !err.response) {
+        console.error(err);
+      } else {
+        console.warn("Validation error:", err.message);
+      }
       setModalError(err.message || "Une erreur est survenue");
     } finally {
       setIsSubmitting(false);
@@ -634,7 +638,7 @@ export default function UtilisateursPage() {
                         return (
                           <>
                             <label className="block text-sm font-bold text-gray-700 mb-1.5">
-                              Responsable {isRootRole ? '' : '(Optionnel)'}
+                              Responsable {isRootRole ? '(Optionnel)' : '*'}
                             </label>
                             {isRootRole ? (
                               <div className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 italic">
@@ -646,11 +650,12 @@ export default function UtilisateursPage() {
                               </div>
                             ) : (
                               <select 
+                                required={!isRootRole}
                                 value={formData.managerId}
                                 onChange={(e) => setFormData({...formData, managerId: e.target.value})}
                                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
                               >
-                                <option value="">-- Aucun --</option>
+                                <option value="">-- Sélectionner --</option>
                                 {filteredManagers.map(m => (
                                   <option key={m.id} value={m.id}>
                                     {m.nom} — {ROLE_LABELS[m.role] || m.role}

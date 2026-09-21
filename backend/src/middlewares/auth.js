@@ -15,6 +15,10 @@ const protect = async (req, res, next) => {
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
       });
+      
+      if (user) {
+        delete user.mot_de_passe;
+      }
 
       if (!user) {
         return res.status(401).json({ error: "Utilisateur non trouvé" });
