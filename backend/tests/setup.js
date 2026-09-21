@@ -1,9 +1,11 @@
 const { execSync } = require('child_process');
 const path = require('path');
 
+require('dotenv').config({ path: path.resolve(__dirname, '../.env.test') });
+
 // Force test environment variables before requiring db or app
-process.env.DATABASE_URL = process.env.DATABASE_URL_TEST || 'mongodb+srv://omar:IgjTwxx7yyvwSSSc@cluster0.rdjpu.mongodb.net/DashboardPPEProcessTest?retryWrites=true&w=majority';
-process.env.JWT_SECRET = 'super_secret_test_jwt_key_that_is_long_enough_for_sure_123456';
+process.env.DATABASE_URL = process.env.DATABASE_URL_TEST || 'mongodb://localhost:27018/ERP_MES_TEST?replicaSet=rs0';
+process.env.JWT_SECRET = process.env.JWT_SECRET_TEST || 'mock_test_jwt_secret_key_123456';
 process.env.NODE_ENV = 'test';
 
 const schemaPath = path.resolve(__dirname, '../prisma/schema.prisma');
@@ -12,7 +14,7 @@ try {
   execSync(`npx prisma db push --schema="${schemaPath}" --accept-data-loss --skip-generate`, {
     env: {
       ...process.env,
-      DATABASE_URL: process.env.DATABASE_URL_TEST || 'mongodb+srv://omar:IgjTwxx7yyvwSSSc@cluster0.rdjpu.mongodb.net/DashboardPPEProcessTest?retryWrites=true&w=majority'
+      DATABASE_URL: process.env.DATABASE_URL_TEST || 'mongodb://localhost:27017/test_db'
     },
     stdio: 'ignore'
   });

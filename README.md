@@ -73,7 +73,7 @@ cd backend
 npm install
 cp .env.example .env   # then fill in DATABASE_URL, JWT_SECRET, etc.
 npm run prisma:generate
-npm run prisma:migrate
+npx prisma db push
 npm run prisma:seed     # optional: seed sample data
 npm run dev              # starts the API with nodemon
 ```
@@ -99,10 +99,20 @@ The frontend runs on `http://localhost:3000` by default and expects the backend 
 
 ### Running Tests
 
+> [!WARNING]
+> **MongoDB Replica Set Required:** The testing environment and local transactional flows strictly require MongoDB to be configured as a Replica Set. Standard standalone MongoDB installations will block Prisma transactions, causing tests to fail or hang. If your local MongoDB is not a Replica Set, automated tests and multi-document transactions (e.g., Stock Allocation, Planification progress updates) will be blocked.
+
 ```bash
 cd backend
 npm test
 ```
+
+### Production Deployment Readiness
+
+- The frontend is fully statically optimizable using `npm run build` producing a production-ready Next.js bundle.
+- Ensure the backend has a valid MongoDB Replica Set URI in the `DATABASE_URL`.
+- Expose the required `.env` variables securely. Do NOT commit production credentials to `.env`.
+- Backend logs errors to `console.error` and sanitizes response bodies to prevent stack trace leaks in non-development environments.
 
 ## Scripts Reference (backend)
 
@@ -110,7 +120,7 @@ npm test
 |--------------------------|--------------------------------------------|
 | `npm start`               | Run the API in production mode            |
 | `npm run dev`              | Run the API with auto-reload (nodemon)    |
-| `npm test`                 | Run Jest test suite                       |
+| `npm test`                 | Run Jest test suite (requires Replica Set)|
 | `npm run prisma:generate`  | Generate the Prisma client                |
 | `npm run prisma:migrate`   | Run Prisma migrations                     |
 | `npm run prisma:seed`      | Seed the database with sample data        |

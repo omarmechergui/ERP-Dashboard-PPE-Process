@@ -51,38 +51,57 @@ const handleStockSortieForValidation = async (tx, panneauId, supervisorMatricule
 // @access  Private
 const getPanneaux = async (req, res, next) => {
   try {
-    const { project } = req.query;
+    const { project, search, page, limit } = req.query;
     const where = {};
 
     if (project) {
       where.title_project = project;
     }
 
-    const panneaux = await prisma.panneau.findMany({
-      where,
-      include: {
-        bom: { 
-          select: { 
-            nom_bom: true, 
-            nom_projet: true,
-            lignes: {
-              select: {
-                quantite: true,
-                article: {
-                  select: {
-                    nom_article: true,
-                    quantite: true
+    if (search) {
+      where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
+        { title_panneau: { contains: search, mode: 'insensitive' } },
+        { title_project: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const isPaginated = page !== undefined || limit !== undefined;
+    const pageNum = parseInt(page) || 1;
+    const limitNum = Math.min(parseInt(limit) || 25, 100);
+    const skip = isPaginated ? (pageNum - 1) * limitNum : undefined;
+    const take = isPaginated ? limitNum : undefined;
+
+    const [panneaux, total] = await Promise.all([
+      prisma.panneau.findMany({
+        where,
+        include: {
+          bom: { 
+            select: { 
+              nom_bom: true, 
+              nom_projet: true,
+              lignes: {
+                select: {
+                  quantite: true,
+                  article: {
+                    select: {
+                      nom_article: true,
+                      quantite: true
+                    }
                   }
                 }
               }
-            }
-          } 
+            } 
+          },
+          entrepot: { select: { nom: true } },
+          superviseur: { select: { nom: true, matricule: true } }
         },
-        entrepot: { select: { nom: true } },
-        superviseur: { select: { nom: true, matricule: true } }
-      },
-      orderBy: { id: 'asc' },
-    });
+        orderBy: { id: 'asc' },
+        skip,
+        take
+      }),
+      isPaginated ? prisma.panneau.count({ where }) : Promise.resolve(0) // Only count if paginated
+    ]);
 
     const formattedPanneaux = panneaux.map(p => {
       let composants = [];
@@ -96,12 +115,23 @@ const getPanneaux = async (req, res, next) => {
       return {
         ...p,
         composants,
-        // Omit the full lignes array from the response if we only needed them for composants
         bom: { nom_bom: p.bom?.nom_bom, nom_projet: p.bom?.nom_projet } 
       };
     });
 
-    res.json(formattedPanneaux);
+    if (isPaginated) {
+      res.json({
+        data: formattedPanneaux,
+        meta: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum)
+        }
+      });
+    } else {
+      res.json(formattedPanneaux); // Backward compatibility for legacy callers
+    }
   } catch (error) {
     next(error);
   }
@@ -317,6 +347,18 @@ const deletePanneau = async (req, res, next) => {
       return res.status(404).json({ error: "Panneau non trouvé" });
     }
 
+    const machine = await prisma.machine.findUnique({
+      where: { code: id },
+      include: {
+        interventions: true,
+        preventiveMaintenances: true
+      }
+    });
+
+    if (machine && (machine.interventions.length > 0 || machine.preventiveMaintenances.length > 0)) {
+      return res.status(400).json({ error: "Impossible de supprimer ce panneau : un historique de maintenance (interventions ou préventif) existe déjà." });
+    }
+
     // Sync Machine deletion
     await prisma.$transaction(async (tx) => {
       await tx.machine.deleteMany({ where: { code: id } });
@@ -395,6 +437,10 @@ const patchEtat = async (req, res, next) => {
 
     if (finalKhm === 'CONFORME' && finalValidation !== 'VALIDE') {
       return res.status(400).json({ error: "Le panneau doit d'abord être validé avant d'être marqué conforme KHM" });
+    }
+
+    if (newStatus === 'TERMINE' && finalKhm !== 'CONFORME') {
+      return res.status(400).json({ error: "Le panneau ne peut pas être terminé car le contrôle KHM n'est pas conforme" });
     }
 
     let historyRecord = null;

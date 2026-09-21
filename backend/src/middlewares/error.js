@@ -24,7 +24,10 @@ const errorHandler = (err, req, res, next) => {
   }
 
   let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-  let message = err.message || "Une erreur interne du serveur est survenue";
+  let message = "Une erreur interne du serveur est survenue";
+  if (process.env.NODE_ENV === 'development') {
+    message = err.message || message;
+  }
   let code = 'INTERNAL_ERROR';
 
   if (err instanceof ZodError) {

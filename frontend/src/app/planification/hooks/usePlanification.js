@@ -22,7 +22,7 @@ export function usePlanification() {
       // Assuming the backend returns { data, meta }
       return res.data;
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur de chargement des planifications");
+      setError(err.response?.data?.message || err.response?.data?.error || "Erreur de chargement des planifications");
       throw err;
     } finally {
       setLoading(false);
@@ -36,7 +36,7 @@ export function usePlanification() {
       const res = await API.get(`/planifications/${id}`);
       return res.data;
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur de chargement de la planification");
+      setError(err.response?.data?.message || err.response?.data?.error || "Erreur de chargement de la planification");
       throw err;
     } finally {
       setLoading(false);
@@ -71,7 +71,7 @@ export function usePlanification() {
       const res = await API.post('/planifications', data);
       return res.data;
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur de création");
+      setError(err.response?.data?.message || err.response?.data?.error || "Erreur de création");
       throw err;
     } finally {
       setLoading(false);
@@ -85,7 +85,7 @@ export function usePlanification() {
       const res = await API.put(`/planifications/${id}`, data);
       return res.data;
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur de mise à jour");
+      setError(err.response?.data?.message || err.response?.data?.error || "Erreur de mise à jour");
       throw err;
     } finally {
       setLoading(false);
@@ -100,7 +100,7 @@ export function usePlanification() {
       const res = await API.post(`/planifications/${id}/planifier`);
       return res.data;
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur lors de la planification");
+      setError(err.response?.data?.message || err.response?.data?.error || "Erreur lors de la planification");
       throw err;
     } finally {
       setLoading(false);
@@ -114,7 +114,7 @@ export function usePlanification() {
       const res = await API.post(`/planifications/${id}/start`);
       return res.data;
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur lors du lancement de la production");
+      setError(err.response?.data?.message || err.response?.data?.error || "Erreur lors du lancement de la production");
       throw err;
     } finally {
       setLoading(false);
@@ -128,7 +128,7 @@ export function usePlanification() {
       const res = await API.post(`/planifications/${id}/cancel`, { reason });
       return res.data;
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur lors de l'annulation");
+      setError(err.response?.data?.message || err.response?.data?.error || "Erreur lors de l'annulation");
       throw err;
     } finally {
       setLoading(false);
@@ -142,7 +142,7 @@ export function usePlanification() {
       const res = await API.post(`/planifications/${id}/complete`);
       return res.data;
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur lors de la clôture de la production");
+      setError(err.response?.data?.message || err.response?.data?.error || "Erreur lors de la clôture de la production");
       throw err;
     } finally {
       setLoading(false);
@@ -156,7 +156,7 @@ export function usePlanification() {
       const res = await API.patch(`/planifications/${id}/progress`, { progress });
       return res.data;
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur lors de la mise à jour du progrès");
+      setError(err.response?.data?.message || err.response?.data?.error || "Erreur lors de la mise à jour du progrès");
       throw err;
     } finally {
       setLoading(false);
@@ -170,7 +170,7 @@ export function usePlanification() {
       await API.delete(`/planifications/${id}`);
       return true;
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur de suppression");
+      setError(err.response?.data?.message || err.response?.data?.error || "Erreur de suppression");
       throw err;
     } finally {
       setLoading(false);

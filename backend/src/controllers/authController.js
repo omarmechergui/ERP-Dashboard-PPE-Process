@@ -78,7 +78,7 @@ const register = async (req, res, next) => {
       email: z.string().email('Email invalide'),
       matricule: z.string().min(1, 'Le matricule est requis'),
       mot_de_passe: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
-      role: z.string().optional().default('OPERATEUR'),
+      role: z.enum(['ADMIN', 'MANAGER', 'GL', 'TL', 'SUPERVISEUR', 'DESIGNER', 'TECHNICIEN', 'TECHNICIENSTOCK', 'OPERATEUR']).optional().default('OPERATEUR'),
     });
 
     const validation = registerSchema.safeParse(req.body);

@@ -93,13 +93,22 @@ export default function PanneauxPage() {
     createPanneau,
     updatePanneau,
     deletePanneau,
-    getPanneauDetails
+    getPanneauDetails,
+    fetchPanneaux
   } = usePanneaux();
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProject, setSelectedProject] = useState("");
   const [selectedSupervisor, setSelectedSupervisor] = useState("");
+
+  // Debounced Search Effect
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      fetchPanneaux(searchQuery);
+    }, 500); // 500ms debounce
+    return () => clearTimeout(handler);
+  }, [searchQuery, fetchPanneaux]);
 
   // UI State
   const [activeTab, setActiveTab] = useState("kanban");
@@ -118,20 +127,14 @@ export default function PanneauxPage() {
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4000);
   }, []);
 
-  // Filter Logic
+  // Filter Logic (Client-side for fast secondary filtering like project/supervisor)
   const filteredPanneaux = useMemo(() => {
     return panneaux.filter(p => {
       if (selectedProject && p.title_project !== selectedProject) return false;
       if (selectedSupervisor && (p.superviseur_id != selectedSupervisor && p.superviseur?.matricule != selectedSupervisor && p.superviseur?.id != selectedSupervisor)) return false;
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchId = p.id ? String(p.id).toLowerCase().includes(query) : false;
-        const matchTitle = p.title_panneau ? String(p.title_panneau).toLowerCase().includes(query) : false;
-        if (!matchId && !matchTitle) return false;
-      }
-      return true;
+      return true; // searchQuery is now handled by the backend
     });
-  }, [panneaux, selectedProject, selectedSupervisor, searchQuery]);
+  }, [panneaux, selectedProject, selectedSupervisor]);
 
   const columns = [
     {

@@ -184,7 +184,7 @@ export default function PlanificationForm({ isOpen, onClose, onSubmit, initialDa
       
       onSubmit();
     } catch (err) {
-      setError(err.response?.data?.error || "Une erreur est survenue.");
+      setError(err.response?.data?.message || err.response?.data?.error || "Une erreur est survenue.");
     } finally {
       setLoading(false);
     }

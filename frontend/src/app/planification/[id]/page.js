@@ -45,7 +45,7 @@ export default function PlanificationDetailPage({ params }) {
         await completePlanification(id);
         fetchData();
       } catch (err) {
-        alert("Erreur: " + (err.response?.data?.error || err.message));
+        alert("Erreur: " + (err.response?.data?.message || err.response?.data?.error || err.message));
       }
     }
   };
@@ -55,7 +55,7 @@ export default function PlanificationDetailPage({ params }) {
       await planifier(id);
       fetchData();
     } catch (err) {
-      alert("Erreur lors de la planification: " + (err.response?.data?.error || err.message));
+      alert("Erreur lors de la planification: " + (err.response?.data?.message || err.response?.data?.error || err.message));
     }
   };
 
@@ -65,7 +65,7 @@ export default function PlanificationDetailPage({ params }) {
         await startProduction(id);
         fetchData();
       } catch (err) {
-        alert("Erreur: " + (err.response?.data?.error || err.message));
+        alert("Erreur: " + (err.response?.data?.message || err.response?.data?.error || err.message));
       }
     }
   };
@@ -77,7 +77,7 @@ export default function PlanificationDetailPage({ params }) {
       setIsCancelModalOpen(false);
       fetchData();
     } catch (err) {
-      alert("Erreur: " + (err.response?.data?.error || err.message));
+      alert("Erreur: " + (err.response?.data?.message || err.response?.data?.error || err.message));
     }
   };
 

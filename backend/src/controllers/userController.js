@@ -15,6 +15,8 @@ const createUserSchema = z.object({
   managerId: z.string().nullable().optional(),
   phoneNumber: z.string().trim().optional().nullable(),
   hireDate: z.string().optional().nullable().transform(val => val ? new Date(val) : null),
+  department: z.string().trim().optional().nullable(),
+  position: z.string().trim().optional().nullable(),
 });
 
 const updateUserSchema = z.object({
@@ -27,6 +29,8 @@ const updateUserSchema = z.object({
   managerId: z.string().nullable().optional(),
   phoneNumber: z.string().trim().optional().nullable(),
   hireDate: z.string().optional().nullable().transform(val => val ? new Date(val) : null),
+  department: z.string().trim().optional().nullable(),
+  position: z.string().trim().optional().nullable(),
 });
 
 // @desc    Get all users
@@ -119,7 +123,7 @@ const createUser = async (req, res, next) => {
       throw new AppError(validation.error.errors[0].message, 400, 'VALIDATION_ERROR');
     }
 
-    const { matricule, email, nom, mot_de_passe, role, statut, managerId, phoneNumber, hireDate } = validation.data;
+    const { matricule, email, nom, mot_de_passe, role, statut, managerId, phoneNumber, hireDate, department, position } = validation.data;
 
     // Validate manager if provided
     await validateManagerAssignment(null, managerId, role, prisma);
@@ -151,8 +155,8 @@ const createUser = async (req, res, next) => {
         managerId: managerId || null,
         phoneNumber: phoneNumber || null,
         hireDate: hireDate || null,
-        department: req.body.department || null,
-        position: req.body.position || null,
+        department: department || null,
+        position: position || null,
       },
       select: {
         id: true,
@@ -201,8 +205,8 @@ const updateUser = async (req, res, next) => {
     // Explicit null assignments if empty strings are sent to clear them
     if (updateData.phoneNumber === "") updateData.phoneNumber = null;
     
-    if (req.body.department !== undefined) updateData.department = req.body.department;
-    if (req.body.position !== undefined) updateData.position = req.body.position;
+    if (updateData.department !== undefined) updateData.department = updateData.department;
+    if (updateData.position !== undefined) updateData.position = updateData.position;
 
     // Check unique constraints if matricule or email is being updated
     if (updateData.matricule && updateData.matricule !== existingUser.matricule) {

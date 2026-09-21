@@ -17,6 +17,18 @@ export function usePanneaux() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const fetchPanneaux = useCallback(async (searchQuery = "") => {
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('search', searchQuery);
+      
+      const panRes = await API.get(`/panneaux?${params.toString()}`);
+      setPanneaux(panRes.data?.data || panRes.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
@@ -29,7 +41,7 @@ export function usePanneaux() {
         API.get('/planifications').catch(() => ({ data: [] }))
       ]);
 
-      setPanneaux(panRes.data || []);
+      setPanneaux(panRes.data?.data || panRes.data || []);
       setBoms(bomRes.data || []);
       setEntrepots(entRes.data || []);
       setPlanifications(planRes.data?.data || (Array.isArray(planRes.data) ? planRes.data : []));
@@ -123,6 +135,7 @@ export function usePanneaux() {
     createPanneau,
     updatePanneau,
     deletePanneau,
-    getPanneauDetails
+    getPanneauDetails,
+    fetchPanneaux
   };
 }

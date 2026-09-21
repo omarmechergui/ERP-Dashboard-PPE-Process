@@ -219,6 +219,13 @@ model Panneau {
   history     PanneauHistory[]
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+
+  @@index([title_panneau])
+  @@index([title_project])
+  @@index([planification_id])
+  @@index([superviseur_id])
+  @@index([bom_id])
+  @@index([etat_construction])
 }
 
 model MouvementStock {

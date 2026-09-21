@@ -169,11 +169,11 @@ const getPlanifications = async (req, res, next) => {
 
     // Compute progress for each
     const formattedPlanifications = planifications.map(p => {
-      const progress = computeProgress(p);
+      const computed_progress = computeProgress(p);
       const { panneaux, ...rest } = p;
       return {
         ...rest,
-        progress
+        computed_progress
       };
     });
 
@@ -208,7 +208,7 @@ const getPlanificationById = async (req, res, next) => {
       return res.status(404).json({ error: 'Planification non trouvée' });
     }
 
-    const progress = computeProgress(planification);
+    const computed_progress = computeProgress(planification);
     
     // Calculate panneaux summary
     const panneauxSummary = {
@@ -222,7 +222,7 @@ const getPlanificationById = async (req, res, next) => {
 
     res.json({
       ...rest,
-      progress,
+      computed_progress,
       panneauxSummary,
       panneaux // Keep them for the detail page if needed, or omit to save payload size
     });
@@ -735,9 +735,14 @@ const deletePlanification = async (req, res, next) => {
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.planificationHistory.deleteMany({
-        where: { planification_id: id }
+      // Orphan the history records to preserve audit trail
+      await tx.planificationHistory.updateMany({
+        where: { planification_id: id },
+        data: {
+          planification_id: null
+        }
       });
+      
       await tx.planification.delete({
         where: { id }
       });

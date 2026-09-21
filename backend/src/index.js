@@ -1,7 +1,7 @@
 const app = require('./app');
 
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your_jwt_secret_key_here_change_in_production') {
-  console.error('FATAL: JWT_SECRET is missing or matches the default placeholder value. Server cannot start.');
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is missing. Server cannot start.');
   process.exit(1);
 }
 
