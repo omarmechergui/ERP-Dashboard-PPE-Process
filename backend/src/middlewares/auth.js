@@ -42,6 +42,8 @@ const protect = async (req, res, next) => {
   }
 };
 
+const { hasPermission } = require('../config/permissions');
+
 const requireRole = (roles) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -60,5 +62,19 @@ const requireRole = (roles) => {
   };
 };
 
-module.exports = { protect, requireRole };
+const requirePermission = (permission) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Non autorisé" });
+    }
+
+    if (!hasPermission(req.user.role, permission)) {
+      return res.status(403).json({ error: "Accès refusé : permission insuffisante" });
+    }
+
+    next();
+  };
+};
+
+module.exports = { protect, requireRole, requirePermission };
   

@@ -12,6 +12,7 @@ import InterventionDetailModal from "./components/modal/InterventionDetailModal"
 import LoadingState from "../../components/ui/LoadingSkeleton";
 import ErrorState from "../../components/ui/ErrorState";
 import PageHeader from "../../components/ui/PageHeader";
+import Modal from "../../components/ui/Modal";
 
 export default function InterventionsPage() {
   const {
@@ -41,6 +42,8 @@ export default function InterventionsPage() {
   const [editingIntervention, setEditingIntervention] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailInterventionId, setDetailInterventionId] = useState(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [interventionToDelete, setInterventionToDelete] = useState(null);
 
   const handleOpenModal = (intervention = null) => {
     setEditingIntervention(intervention);
@@ -147,9 +150,8 @@ export default function InterventionsPage() {
               onEdit={handleOpenModal}
               onDuplicate={handleDuplicate}
               onDelete={(id) => {
-                if (window.confirm("Êtes-vous sûr de vouloir supprimer cette intervention ?")) {
-                  deleteIntervention(id);
-                }
+                setInterventionToDelete(id);
+                setDeleteModalOpen(true);
               }}
               onChangeStatus={changeStatus}
             />
@@ -173,6 +175,42 @@ export default function InterventionsPage() {
           interventionId={detailInterventionId}
           onUpdate={refreshData}
         />
+
+        <Modal
+          isOpen={deleteModalOpen}
+          onClose={() => setDeleteModalOpen(false)}
+          title="Confirmer la suppression"
+          description="Êtes-vous sûr de vouloir supprimer cette intervention ? Cette action est irréversible."
+          maxWidth="max-w-md"
+          footer={
+            <>
+              <button 
+                onClick={() => setDeleteModalOpen(false)}
+                className="px-4 py-2 text-sm font-bold text-secondary-foreground bg-card border border-border rounded-xl hover:bg-secondary transition-all"
+              >
+                Annuler
+              </button>
+              <button 
+                onClick={async () => {
+                  if (interventionToDelete) {
+                    await deleteIntervention(interventionToDelete);
+                    setDeleteModalOpen(false);
+                    setInterventionToDelete(null);
+                  }
+                }}
+                className="px-4 py-2 text-sm font-bold text-danger-foreground bg-danger rounded-xl hover:bg-danger/90 transition-all shadow-sm"
+              >
+                Supprimer
+              </button>
+            </>
+          }
+        >
+          <div className="py-4">
+            <p className="text-sm text-secondary-foreground">
+              Toutes les données associées à cette intervention seront définitivement effacées.
+            </p>
+          </div>
+        </Modal>
       </div>
     </div>
   );

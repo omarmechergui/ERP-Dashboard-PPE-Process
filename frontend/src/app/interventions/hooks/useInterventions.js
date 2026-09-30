@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { interventionService } from '../services/interventionService';
+import API from '../../../lib/api';
 
 export function useInterventions(initialFilters = {}) {
-  const [data, setData] = useState({ interventions: [], timeline: [] });
+  const [data, setData] = useState({ interventions: [], timeline: [], kpis: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState(initialFilters);
@@ -12,8 +13,15 @@ export function useInterventions(initialFilters = {}) {
     setLoading(true);
     setError(null);
     try {
-      const response = await interventionService.getAll(currentFilters);
-      setData(response?.data || { interventions: [], timeline: [] });
+      const [intResponse, kpiResponse] = await Promise.all([
+        interventionService.getAll(currentFilters),
+        interventionService.getKpis(currentFilters)
+      ]);
+      setData({
+        interventions: intResponse?.data?.interventions || [],
+        timeline: intResponse?.data?.timeline || [],
+        kpis: kpiResponse?.data || null
+      });
     } catch (err) {
       console.error(err);
       setError("Erreur lors du chargement des interventions.");
@@ -28,8 +36,15 @@ export function useInterventions(initialFilters = {}) {
       setLoading(true);
       setError(null);
       try {
-        const response = await interventionService.getAll(filters);
-        if (!cancelled) setData(response?.data || { interventions: [], timeline: [] });
+        const [intResponse, kpiResponse] = await Promise.all([
+          interventionService.getAll(filters),
+          interventionService.getKpis(filters)
+        ]);
+        if (!cancelled) setData({
+          interventions: intResponse?.data?.interventions || [],
+          timeline: intResponse?.data?.timeline || [],
+          kpis: kpiResponse?.data || null
+        });
       } catch (err) {
         console.error(err);
         if (!cancelled) setError("Erreur lors du chargement des interventions.");
@@ -53,8 +68,15 @@ export function useInterventions(initialFilters = {}) {
     setLoading(true);
     try {
       await interventionService.create(interventionData);
-      const response = await interventionService.getAll(filters);
-      setData(response?.data || { interventions: [], timeline: [] });
+      const [intResponse, kpiResponse] = await Promise.all([
+        interventionService.getAll(filters),
+        interventionService.getKpis(filters)
+      ]);
+      setData({
+        interventions: intResponse?.data?.interventions || [],
+        timeline: intResponse?.data?.timeline || [],
+        kpis: kpiResponse?.data || null
+      });
       return { success: true };
     } catch (err) {
       console.error(err);
@@ -67,8 +89,15 @@ export function useInterventions(initialFilters = {}) {
   const updateIntervention = useCallback(async (id, interventionData) => {
     try {
       await interventionService.update(id, interventionData);
-      const response = await interventionService.getAll(filters);
-      setData(response?.data || { interventions: [], timeline: [] });
+      const [intResponse, kpiResponse] = await Promise.all([
+        interventionService.getAll(filters),
+        interventionService.getKpis(filters)
+      ]);
+      setData({
+        interventions: intResponse?.data?.interventions || [],
+        timeline: intResponse?.data?.timeline || [],
+        kpis: kpiResponse?.data || null
+      });
       return { success: true };
     } catch (err) {
       console.error(err);
@@ -79,8 +108,15 @@ export function useInterventions(initialFilters = {}) {
   const deleteIntervention = useCallback(async (id) => {
     try {
       await interventionService.delete(id);
-      const response = await interventionService.getAll(filters);
-      setData(response?.data || { interventions: [], timeline: [] });
+      const [intResponse, kpiResponse] = await Promise.all([
+        interventionService.getAll(filters),
+        interventionService.getKpis(filters)
+      ]);
+      setData({
+        interventions: intResponse?.data?.interventions || [],
+        timeline: intResponse?.data?.timeline || [],
+        kpis: kpiResponse?.data || null
+      });
       return { success: true };
     } catch (err) {
       console.error(err);
@@ -91,8 +127,15 @@ export function useInterventions(initialFilters = {}) {
   const changeStatus = useCallback(async (id, newStatus) => {
     try {
       await interventionService.changeStatus(id, newStatus);
-      const response = await interventionService.getAll(filters);
-      setData(response?.data || { interventions: [], timeline: [] });
+      const [intResponse, kpiResponse] = await Promise.all([
+        interventionService.getAll(filters),
+        interventionService.getKpis(filters)
+      ]);
+      setData({
+        interventions: intResponse?.data?.interventions || [],
+        timeline: intResponse?.data?.timeline || [],
+        kpis: kpiResponse?.data || null
+      });
       return { success: true };
     } catch (err) {
       console.error(err);
@@ -103,8 +146,15 @@ export function useInterventions(initialFilters = {}) {
   const startIntervention = useCallback(async (id) => {
     try {
       await interventionService.start(id);
-      const response = await interventionService.getAll(filters);
-      setData(response?.data || { interventions: [], timeline: [] });
+      const [intResponse, kpiResponse] = await Promise.all([
+        interventionService.getAll(filters),
+        interventionService.getKpis(filters)
+      ]);
+      setData({
+        interventions: intResponse?.data?.interventions || [],
+        timeline: intResponse?.data?.timeline || [],
+        kpis: kpiResponse?.data || null
+      });
       return { success: true };
     } catch (err) {
       console.error(err);
@@ -115,8 +165,15 @@ export function useInterventions(initialFilters = {}) {
   const completeIntervention = useCallback(async (id, dataObj) => {
     try {
       await interventionService.complete(id, dataObj);
-      const response = await interventionService.getAll(filters);
-      setData(response?.data || { interventions: [], timeline: [] });
+      const [intResponse, kpiResponse] = await Promise.all([
+        interventionService.getAll(filters),
+        interventionService.getKpis(filters)
+      ]);
+      setData({
+        interventions: intResponse?.data?.interventions || [],
+        timeline: intResponse?.data?.timeline || [],
+        kpis: kpiResponse?.data || null
+      });
       return { success: true };
     } catch (err) {
       console.error(err);
@@ -127,8 +184,15 @@ export function useInterventions(initialFilters = {}) {
   const cancelIntervention = useCallback(async (id, reason) => {
     try {
       await interventionService.cancel(id, reason);
-      const response = await interventionService.getAll(filters);
-      setData(response?.data || { interventions: [], timeline: [] });
+      const [intResponse, kpiResponse] = await Promise.all([
+        interventionService.getAll(filters),
+        interventionService.getKpis(filters)
+      ]);
+      setData({
+        interventions: intResponse?.data?.interventions || [],
+        timeline: intResponse?.data?.timeline || [],
+        kpis: kpiResponse?.data || null
+      });
       return { success: true };
     } catch (err) {
       console.error(err);
@@ -174,6 +238,13 @@ export function useInterventions(initialFilters = {}) {
     if (filters.type && filters.type !== 'Tous') {
       result = result.filter(int => int.type === filters.type);
     }
+    if (filters.kpiType && filters.kpiType !== 'Tous') {
+      if (filters.kpiType === 'None') {
+        result = result.filter(int => int.kpiType === null || int.kpiType === '');
+      } else {
+        result = result.filter(int => int.kpiType === filters.kpiType);
+      }
+    }
     
     return result;
   }, [data.interventions, searchQuery, filters]);
@@ -192,12 +263,14 @@ export function useInterventions(initialFilters = {}) {
       completed,
       critical,
       completionRate,
-      mttr: 'N/A',
-      avgResponse: 'N/A',
-      availability: 'N/A',
-      preventiveRatio: 'N/A'
+      mttr: data.kpis?.mttr || 'N/A',
+      mttrQuality: data.kpis?.mttrQuality || null,
+      mtbf: data.kpis?.mtbf || 'N/A',
+      mtbfQuality: data.kpis?.mtbfQuality || null,
+      availability: data.kpis?.disponibilite || 'N/A',
+      preventiveRatio: data.kpis?.preventiveRatio || 'N/A'
     };
-  }, [filteredInterventions]);
+  }, [filteredInterventions, data.kpis]);
 
   return {
     interventions: filteredInterventions,

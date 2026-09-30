@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Plus, RefreshCw, AlertCircle, LayoutDashboard, CheckCircle2, X, MoreVertical, Edit, Trash2, Eye } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { usePanneaux } from "./hooks/usePanneaux";

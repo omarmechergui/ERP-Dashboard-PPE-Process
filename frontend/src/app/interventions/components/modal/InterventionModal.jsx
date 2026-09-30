@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, ShieldCheck, Wrench, FileText, AlertTriangle, Loader2 } from 'lucide-react';
+import { Save, ShieldCheck, Wrench, FileText, AlertTriangle, Loader2, Activity } from 'lucide-react';
 import API from '../../../../lib/api';
-
-// --- Backend data contract (from Prisma schema) ---
-// type:     String  default "Corrective"  → Corrective, Préventive
-// priority: String  default "Normal"      → Basse, Normal, Haute, Critique
-// status:   String  default "En attente"  → En attente, En cours, Clôturée
-// shift:    String? → Matin, Après-midi, Nuit
-// defaut:   String  (REQUIRED)
-// action:   String?
-// downtime: Float?  (hours)
-// machineId:    Int?
-// technicienId: Int?
+import Modal from '../../../../components/ui/Modal';
 
 const TYPE_OPTIONS = [
   { value: 'Corrective', label: 'Corrective' },
@@ -42,6 +32,7 @@ const emptyForm = {
   machineId: '',
   technicienId: '',
   type: 'Corrective',
+  kpiType: '',
   priority: 'Normal',
   shift: '',
   status: 'En attente',
@@ -51,12 +42,12 @@ const emptyForm = {
   codeSap: '',
 };
 
-// --- Mappers between backend API response and form state ---
 function mapInterventionToForm(apiData) {
   return {
     machineId: apiData.machineId ?? '',
     technicienId: apiData.technicienId ?? '',
     type: apiData.type || 'Corrective',
+    kpiType: apiData.kpiType || '',
     priority: apiData.priority || 'Normal',
     shift: apiData.shift || '',
     status: apiData.status || 'En attente',
@@ -72,6 +63,7 @@ function mapFormToPayload(formData) {
     machineId: formData.machineId ? formData.machineId : null,
     technicienId: formData.technicienId ? formData.technicienId : null,
     type: formData.type,
+    kpiType: formData.kpiType || null,
     priority: formData.priority,
     shift: formData.shift || null,
     status: formData.status,
@@ -90,13 +82,12 @@ export default function InterventionModal({ isOpen, onClose, onSubmit, initialDa
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState(null);
+  
   const isEditing = !!initialData && !!initialData.id;
 
-  // Load machines and technicians when modal opens
   useEffect(() => {
     if (!isOpen) return;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingRef(true);
     setApiError(null);
 
@@ -115,41 +106,46 @@ export default function InterventionModal({ isOpen, onClose, onSubmit, initialDa
       .finally(() => setLoadingRef(false));
   }, [isOpen]);
 
-  // Populate form when modal opens
   useEffect(() => {
     if (!isOpen) return;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setErrors({});
     setApiError(null);
     setSaving(false);
 
     if (initialData) {
-       
       setFormData(mapInterventionToForm(initialData));
     } else {
       setFormData({ ...emptyForm });
     }
   }, [isOpen, initialData]);
 
-  if (!isOpen) return null;
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    // Clear field error on change
     if (errors[name]) {
       setErrors(prev => { const next = { ...prev }; delete next[name]; return next; });
+    }
+  };
+
+  const handleKpiSelect = (kpiType) => {
+    setFormData(prev => ({ ...prev, kpiType }));
+    if (errors.kpiType) {
+      setErrors(prev => { const next = { ...prev }; delete next.kpiType; return next; });
     }
   };
 
   const validate = () => {
     const newErrors = {};
     if (!formData.defaut || formData.defaut.trim() === '') {
-      newErrors.defaut = 'Ce champ est obligatoire.';
+      newErrors.defaut = 'La description du problème est obligatoire.';
     }
     if (formData.downtime !== '' && (isNaN(parseFloat(formData.downtime)) || parseFloat(formData.downtime) < 0)) {
-      newErrors.downtime = 'Valeur numérique positive requise.';
+      newErrors.downtime = 'La durée doit être une valeur numérique positive.';
+    }
+    // Only require KPI selection on creation or if one was already set
+    if (!isEditing && !formData.kpiType) {
+      newErrors.kpiType = 'Veuillez sélectionner un type de KPI.';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -157,7 +153,12 @@ export default function InterventionModal({ isOpen, onClose, onSubmit, initialDa
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      // Scroll to the first error if needed
+      const firstError = document.querySelector('.border-danger');
+      if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
 
     setSaving(true);
     setApiError(null);
@@ -167,282 +168,331 @@ export default function InterventionModal({ isOpen, onClose, onSubmit, initialDa
       const result = await onSubmit(payload);
 
       if (result && !result.success) {
-        setApiError(result.error || 'Une erreur est survenue.');
+        setApiError(result.error || 'Une erreur est survenue lors de l\'enregistrement.');
         setSaving(false);
       }
-      // If success, parent will close the modal
     } catch (err) {
-      setApiError(err.message || 'Une erreur est survenue.');
+      setApiError(err.message || 'Une erreur inattendue est survenue.');
       setSaving(false);
     }
   };
 
   const inputClass = (field) =>
-    `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${
-      errors[field] ? 'border-red-400 bg-red-50' : 'border-gray-300'
+    `w-full px-4 py-2.5 bg-background border rounded-xl text-sm font-medium transition-all focus:outline-none focus:ring-2 ${
+      errors[field] 
+        ? 'border-danger focus:border-danger focus:ring-danger/20 text-danger' 
+        : 'border-input focus:border-primary focus:ring-primary/20 text-foreground placeholder:text-muted'
     } disabled:opacity-50 disabled:cursor-not-allowed`;
 
-  const selectClass = (field) =>
-    `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white ${
-      errors[field] ? 'border-red-400 bg-red-50' : 'border-gray-300'
-    } disabled:opacity-50 disabled:cursor-not-allowed`;
+  const labelClass = "block text-sm font-semibold text-secondary-foreground mb-1.5";
+
+  const modalFooter = (
+    <>
+      <button 
+        type="button" 
+        onClick={onClose}
+        disabled={saving}
+        className="px-5 py-2.5 text-sm font-bold text-secondary-foreground bg-card border border-border rounded-xl hover:bg-secondary transition-all disabled:opacity-50"
+      >
+        Annuler
+      </button>
+      <button 
+        type="submit" 
+        form="intervention-form"
+        disabled={saving || loadingRef}
+        className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-primary-foreground bg-primary rounded-xl hover:bg-primary-hover transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {saving ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            {isEditing ? 'Enregistrement...' : 'Création...'}
+          </>
+        ) : (
+          <>
+            <Save className="w-4 h-4" />
+            {isEditing ? 'Enregistrer les modifications' : 'Créer l\'intervention'}
+          </>
+        )}
+      </button>
+    </>
+  );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-2xl w-full max-w-4xl shadow-xl flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              {isEditing ? <Wrench className="w-5 h-5 text-blue-600" /> : <ShieldCheck className="w-5 h-5 text-blue-600" />}
-              {isEditing ? 'Modifier l\'intervention' : 'Nouvelle Intervention'}
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Veuillez remplir les informations concernant l&apos;intervention de maintenance.
-            </p>
-          </div>
-          <button 
-            onClick={onClose}
-            disabled={saving}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50"
-          >
-            <X className="w-5 h-5" />
-          </button>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditing ? 'Modifier l\'intervention' : 'Nouvelle Intervention'}
+      description="Remplissez les informations concernant l'intervention de maintenance."
+      footer={modalFooter}
+      maxWidth="max-w-4xl"
+    >
+      {apiError && (
+        <div className="mb-6 p-4 bg-danger/10 border border-danger/20 rounded-xl text-sm font-medium text-danger flex items-start gap-3 animate-fade-in">
+          <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+          <p>{apiError}</p>
         </div>
+      )}
 
-        {/* Form Content */}
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
-          {/* API Error Banner */}
-          {apiError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              {apiError}
-            </div>
-          )}
-
-          {loadingRef ? (
-            <div className="flex items-center justify-center py-12 text-gray-400 gap-2">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Chargement des données...
-            </div>
-          ) : (
-            <form id="intervention-form" onSubmit={handleSubmit} className="space-y-8">
+      {loadingRef ? (
+        <div className="flex flex-col items-center justify-center py-16 text-muted">
+          <Loader2 className="w-8 h-8 animate-spin mb-4 text-primary" />
+          <p className="text-sm font-medium">Chargement des données...</p>
+        </div>
+      ) : (
+        <form id="intervention-form" onSubmit={handleSubmit} className="space-y-8">
+          
+          {/* Section: Informations Générales */}
+          <section className="space-y-5">
+            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-border">
+              <FileText className="w-4 h-4 text-primary" />
+              Informations Générales
+            </h3>
             
-              {/* General Info Section */}
-              <section>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2">
-                  <FileText className="w-4 h-4 text-blue-500" /> Informations Générales
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Machine */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Machine / Équipement</label>
-                    <select
-                      name="machineId"
-                      value={formData.machineId}
-                      onChange={handleChange}
-                      disabled={saving}
-                      className={selectClass('machineId')}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div>
+                <label className={labelClass}>Machine / Équipement</label>
+                <select
+                  name="machineId"
+                  value={formData.machineId}
+                  onChange={handleChange}
+                  disabled={saving}
+                  className={`${inputClass('machineId')} appearance-none`}
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+                >
+                  <option value="">— Aucune —</option>
+                  {machines.map(m => (
+                    <option key={m.id} value={m.id}>{m.code} — {m.nom}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className={labelClass}>Type d&apos;intervention</label>
+                <select
+                  name="type"
+                  value={formData.type}
+                  onChange={handleChange}
+                  disabled={saving}
+                  className={`${inputClass('type')} appearance-none`}
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+                >
+                  {TYPE_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className={labelClass}>Priorité</label>
+                <select
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleChange}
+                  disabled={saving}
+                  className={`${inputClass('priority')} appearance-none`}
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+                >
+                  {PRIORITY_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className={labelClass}>
+                  Problème / Défaut constaté <span className="text-danger">*</span>
+                </label>
+                <textarea
+                  name="defaut"
+                  id="defaut"
+                  value={formData.defaut}
+                  onChange={handleChange}
+                  disabled={saving}
+                  rows={3}
+                  placeholder="Décrivez la panne ou le constat initial..."
+                  className={`${inputClass('defaut')} resize-none`}
+                  aria-required="true"
+                  aria-invalid={!!errors.defaut}
+                />
+                {errors.defaut && <p className="mt-1.5 text-xs font-medium text-danger">{errors.defaut}</p>}
+              </div>
+
+              <div className="flex flex-col">
+                <label id="kpi-label" className={labelClass}>
+                  Type de KPI <span className="text-danger">*</span>
+                </label>
+                {isEditing && !formData.kpiType ? (
+                  <div className="p-4 bg-secondary/50 border border-border rounded-xl text-secondary-foreground text-sm flex-1 flex flex-col justify-center">
+                    <p className="font-bold flex items-center gap-2"><Activity className="w-4 h-4"/> Non défini (Historique)</p>
+                    <p className="mt-1 text-xs opacity-80">Cette intervention utilise la règle de calcul automatique du KPI.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 flex-1" role="radiogroup" aria-labelledby="kpi-label" aria-required="true" aria-invalid={!!errors.kpiType}>
+                    <button 
+                      type="button"
+                      role="radio"
+                      aria-checked={formData.kpiType === 'MTTR'}
+                      onClick={() => !saving && handleKpiSelect('MTTR')}
+                      className={`
+                        relative flex flex-col p-3 cursor-pointer border-2 rounded-xl transition-all duration-200 h-full text-left
+                        ${formData.kpiType === 'MTTR' 
+                          ? 'border-info bg-info/5 shadow-sm' 
+                          : 'border-border bg-card hover:border-info/50 hover:bg-secondary/50'}
+                        ${saving ? 'opacity-50 cursor-not-allowed' : ''}
+                        focus:outline-none focus:ring-2 focus:ring-info/50
+                      `}
                     >
-                      <option value="">— Aucune —</option>
-                      {machines.map(m => (
-                        <option key={m.id} value={m.id}>{m.code} — {m.nom}</option>
-                      ))}
-                    </select>
-                  </div>
+                      <div className="flex items-center justify-between mb-1 w-full">
+                        <span className={`font-bold ${formData.kpiType === 'MTTR' ? 'text-info' : 'text-foreground'}`}>
+                          MTTR
+                        </span>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${formData.kpiType === 'MTTR' ? 'border-info' : 'border-muted'}`}>
+                          {formData.kpiType === 'MTTR' && <div className="w-2 h-2 bg-info rounded-full" />}
+                        </div>
+                      </div>
+                      <span className={`text-xs leading-relaxed ${formData.kpiType === 'MTTR' ? 'text-info/80 font-medium' : 'text-secondary-foreground'}`}>
+                        Intervention corrective / réparation
+                      </span>
+                    </button>
 
-                  {/* Type */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type d&apos;intervention</label>
-                    <select
-                      name="type"
-                      value={formData.type}
-                      onChange={handleChange}
-                      disabled={saving}
-                      className={selectClass('type')}
+                    <button 
+                      type="button"
+                      role="radio"
+                      aria-checked={formData.kpiType === 'MTBF'}
+                      onClick={() => !saving && handleKpiSelect('MTBF')}
+                      className={`
+                        relative flex flex-col p-3 cursor-pointer border-2 rounded-xl transition-all duration-200 h-full text-left
+                        ${formData.kpiType === 'MTBF' 
+                          ? 'border-success bg-success/5 shadow-sm' 
+                          : 'border-border bg-card hover:border-success/50 hover:bg-secondary/50'}
+                        ${saving ? 'opacity-50 cursor-not-allowed' : ''}
+                        focus:outline-none focus:ring-2 focus:ring-success/50
+                      `}
                     >
-                      {TYPE_OPTIONS.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
+                      <div className="flex items-center justify-between mb-1 w-full">
+                        <span className={`font-bold ${formData.kpiType === 'MTBF' ? 'text-success' : 'text-foreground'}`}>
+                          MTBF
+                        </span>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${formData.kpiType === 'MTBF' ? 'border-success' : 'border-muted'}`}>
+                          {formData.kpiType === 'MTBF' && <div className="w-2 h-2 bg-success rounded-full" />}
+                        </div>
+                      </div>
+                      <span className={`text-xs leading-relaxed ${formData.kpiType === 'MTBF' ? 'text-success/80 font-medium' : 'text-secondary-foreground'}`}>
+                        Fiabilité / fonctionnement entre pannes
+                      </span>
+                    </button>
                   </div>
+                )}
+                {errors.kpiType && <p className="mt-1.5 text-xs font-medium text-danger">{errors.kpiType}</p>}
+              </div>
+            </div>
+          </section>
 
-                  {/* Priority */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Priorité</label>
-                    <select
-                      name="priority"
-                      value={formData.priority}
-                      onChange={handleChange}
-                      disabled={saving}
-                      className={selectClass('priority')}
-                    >
-                      {PRIORITY_OPTIONS.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
-                  </div>
+          {/* Section: Exécution */}
+          <section className="space-y-5">
+            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-border">
+              <Wrench className="w-4 h-4 text-warning" />
+              Exécution & Détails
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="lg:col-span-2">
+                <label className={labelClass}>Technicien Assigné</label>
+                <select
+                  name="technicienId"
+                  value={formData.technicienId}
+                  onChange={handleChange}
+                  disabled={saving}
+                  className={`${inputClass('technicienId')} appearance-none`}
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+                >
+                  <option value="">— Non assigné —</option>
+                  {techniciens.map(t => (
+                    <option key={t.id} value={t.id}>{t.empNumber} — {t.name}</option>
+                  ))}
+                </select>
+              </div>
 
-                  {/* Code SAP */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Code SAP</label>
-                    <input
-                      type="text"
-                      name="codeSap"
-                      value={formData.codeSap}
-                      onChange={handleChange}
-                      disabled={saving}
-                      placeholder="Ex: SAP-1234"
-                      className={inputClass('codeSap')}
-                    />
-                  </div>
+              <div>
+                <label className={labelClass}>Temps (minutes)</label>
+                <input
+                  type="number"
+                  name="downtime"
+                  value={formData.downtime}
+                  onChange={handleChange}
+                  disabled={saving}
+                  min="0"
+                  step="1"
+                  placeholder="Ex: 30"
+                  className={inputClass('downtime')}
+                />
+                {errors.downtime && <p className="mt-1.5 text-xs font-medium text-danger">{errors.downtime}</p>}
+              </div>
 
-                  {/* Shift */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Shift / Poste</label>
-                    <select
-                      name="shift"
-                      value={formData.shift}
-                      onChange={handleChange}
-                      disabled={saving}
-                      className={selectClass('shift')}
-                    >
-                      {SHIFT_OPTIONS.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
-                  </div>
+              <div>
+                <label className={labelClass}>Shift / Poste</label>
+                <select
+                  name="shift"
+                  value={formData.shift}
+                  onChange={handleChange}
+                  disabled={saving}
+                  className={`${inputClass('shift')} appearance-none`}
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+                >
+                  {SHIFT_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className={labelClass}>Code SAP</label>
+                <input
+                  type="text"
+                  name="codeSap"
+                  value={formData.codeSap}
+                  onChange={handleChange}
+                  disabled={saving}
+                  placeholder="Ex: SAP-1234"
+                  className={inputClass('codeSap')}
+                />
+              </div>
 
-                  {/* Status */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
-                    <select
-                      name="status"
-                      value={formData.status}
-                      onChange={handleChange}
-                      disabled={saving}
-                      className={selectClass('status')}
-                    >
-                      {STATUS_OPTIONS.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </section>
+              <div>
+                <label className={labelClass}>Statut</label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  disabled={saving}
+                  className={`${inputClass('status')} appearance-none`}
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+                >
+                  {STATUS_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="lg:col-span-2">
+                <label className={labelClass}>Action Réalisée</label>
+                <textarea
+                  name="action"
+                  value={formData.action}
+                  onChange={handleChange}
+                  disabled={saving}
+                  rows={2}
+                  placeholder="Décrivez les actions correctives menées..."
+                  className={`${inputClass('action')} resize-none`}
+                />
+              </div>
+            </div>
+          </section>
 
-              {/* Problem Section */}
-              <section>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2">
-                  <AlertTriangle className="w-4 h-4 text-orange-500" /> Description du Problème
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Panne / Constat <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      name="defaut"
-                      value={formData.defaut}
-                      onChange={handleChange}
-                      required
-                      disabled={saving}
-                      rows={3}
-                      placeholder="Décrivez la panne ou le constat initial..."
-                      className={`${inputClass('defaut')} resize-none`}
-                    ></textarea>
-                    {errors.defaut && <p className="mt-1 text-xs text-red-500">{errors.defaut}</p>}
-                  </div>
-                </div>
-              </section>
-
-              {/* Repair Section */}
-              <section>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2">
-                  <Wrench className="w-4 h-4 text-emerald-500" /> Détails de l&apos;intervention
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                  {/* Technicien */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Technicien Assigné</label>
-                    <select
-                      name="technicienId"
-                      value={formData.technicienId}
-                      onChange={handleChange}
-                      disabled={saving}
-                      className={selectClass('technicienId')}
-                    >
-                      <option value="">— Non assigné —</option>
-                      {techniciens.map(t => (
-                        <option key={t.id} value={t.id}>{t.empNumber} — {t.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Downtime */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Temps d&apos;arrêt (minutes)</label>
-                    <input
-                      type="number"
-                      name="downtime"
-                      value={formData.downtime}
-                      onChange={handleChange}
-                      disabled={saving}
-                      min="0"
-                      step="0.25"
-                      placeholder="Ex: 2.5"
-                      className={inputClass('downtime')}
-                    />
-                    {errors.downtime && <p className="mt-1 text-xs text-red-500">{errors.downtime}</p>}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Action Réalisée</label>
-                  <textarea
-                    name="action"
-                    value={formData.action}
-                    onChange={handleChange}
-                    disabled={saving}
-                    rows={3}
-                    placeholder="Décrivez les actions correctives menées..."
-                    className={`${inputClass('action')} resize-none`}
-                  ></textarea>
-                </div>
-              </section>
-            </form>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3 rounded-b-2xl">
-          <button 
-            type="button" 
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            Annuler
-          </button>
-          <button 
-            type="submit" 
-            form="intervention-form"
-            disabled={saving || loadingRef}
-            className="flex items-center gap-2 px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {isEditing ? 'Enregistrement...' : 'Création en cours...'}
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                {isEditing ? 'Enregistrer les modifications' : 'Créer l\'intervention'}
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+        </form>
+      )}
+    </Modal>
   );
 }

@@ -461,6 +461,8 @@ model Intervention {
   actualStart  DateTime?
   actualEnd    DateTime?
 
+  kpiType      String? // Explicit KPI designation (MTTR or MTBF)
+
   defaut       String? // Legacy field
   cause        String?
   action       String?

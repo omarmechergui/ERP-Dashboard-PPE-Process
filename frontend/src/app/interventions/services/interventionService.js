@@ -16,6 +16,21 @@ export const interventionService = {
     return response.data;
   },
 
+  getKpis: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value && value !== 'Tous' && value !== 'All') {
+        params.append(key, value);
+      }
+    });
+    
+    const queryString = params.toString();
+    const url = queryString ? `/maintenance/kpis?${queryString}` : '/maintenance/kpis';
+    
+    const response = await API.get(url);
+    return response.data;
+  },
+
   getById: async (id) => {
     const response = await API.get(`/maintenance/interventions/${id}`);
     return response.data;

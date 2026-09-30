@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, requireRole } = require('../middlewares/auth');
+const { protect, requireRole, requirePermission } = require('../middlewares/auth');
 
 const {
   getKpis,
@@ -44,61 +44,61 @@ const {
 router.use(protect);
 
 // KPIs
-router.get('/kpis', getKpis);
+router.get('/kpis', requirePermission('INTERVENTIONS_VIEW'), getKpis);
 
 // Interventions
 router.route('/interventions')
-  .get(getInterventions)
-  .post(requireRole(['ADMIN', 'GL', 'SUPERVISEUR', 'TL']), createIntervention);
+  .get(requirePermission('INTERVENTIONS_VIEW'), getInterventions)
+  .post(requirePermission('INTERVENTIONS_CREATE'), createIntervention);
 
 router.route('/interventions/:id')
-  .get(getInterventionById)
-  .put(requireRole(['ADMIN', 'GL', 'SUPERVISEUR', 'TL']), updateIntervention)
-  .delete(requireRole(['ADMIN', 'GL']), deleteIntervention);
+  .get(requirePermission('INTERVENTIONS_VIEW'), getInterventionById)
+  .put(requirePermission('INTERVENTIONS_EDIT'), updateIntervention)
+  .delete(requirePermission('INTERVENTIONS_DELETE'), deleteIntervention);
 
-router.patch('/interventions/:id/status', requireRole(['ADMIN', 'GL', 'SUPERVISEUR', 'TL']), changeInterventionStatus);
+router.patch('/interventions/:id/status', requirePermission('INTERVENTIONS_EDIT'), changeInterventionStatus);
 
 // New CMMS workflow routes
-router.patch('/interventions/:id/start', requireRole(['ADMIN', 'GL', 'SUPERVISEUR', 'TL', 'TECHNICIEN']), startIntervention);
-router.patch('/interventions/:id/complete', requireRole(['ADMIN', 'GL', 'SUPERVISEUR', 'TL', 'TECHNICIEN']), completeIntervention);
-router.patch('/interventions/:id/cancel', requireRole(['ADMIN', 'GL', 'SUPERVISEUR']), cancelIntervention);
-router.post('/interventions/:id/parts', requireRole(['ADMIN', 'GL', 'SUPERVISEUR', 'TL', 'TECHNICIEN']), addInterventionPart);
+router.patch('/interventions/:id/start', requirePermission('INTERVENTIONS_EDIT'), startIntervention);
+router.patch('/interventions/:id/complete', requirePermission('INTERVENTIONS_EDIT'), completeIntervention);
+router.patch('/interventions/:id/cancel', requirePermission('INTERVENTIONS_EDIT'), cancelIntervention);
+router.post('/interventions/:id/parts', requirePermission('INTERVENTIONS_EDIT'), addInterventionPart);
 
 // Techniciens
 router.route('/techniciens')
-  .get(getTechniciens);
+  .get(requirePermission('TECHNICIENS_VIEW'), getTechniciens);
 
 // Formation Catalog
 router.route('/formation-catalog')
-  .get(getFormationCatalog)
-  .post(requireRole(['ADMIN', 'GL', 'SUPERVISEUR']), createFormationCatalog);
+  .get(requirePermission('FORMATION_VIEW'), getFormationCatalog)
+  .post(requirePermission('FORMATION_CREATE'), createFormationCatalog);
 
 // Formations
 router.route('/formations')
-  .get(getFormations)
-  .post(requireRole(['ADMIN', 'GL', 'SUPERVISEUR']), createFormation);
+  .get(requirePermission('FORMATION_VIEW'), getFormations)
+  .post(requirePermission('FORMATION_CREATE'), createFormation);
 
 router.route('/formations/:id')
-  .get(getFormationById)
-  .put(requireRole(['ADMIN', 'GL', 'SUPERVISEUR']), updateFormation)
-  .delete(requireRole(['ADMIN', 'GL']), deleteFormation);
+  .get(requirePermission('FORMATION_VIEW'), getFormationById)
+  .put(requirePermission('FORMATION_EDIT'), updateFormation)
+  .delete(requirePermission('FORMATION_DELETE'), deleteFormation);
 
-router.get('/formations/:id/history', getFormationHistory);
+router.get('/formations/:id/history', requirePermission('FORMATION_VIEW'), getFormationHistory);
 
 // Machines (Helper for dropdowns)
-router.get('/machines', getMachines);
+router.get('/machines', requirePermission('MACHINES_VIEW'), getMachines);
 
 // Preventive Maintenance
-router.get('/preventive', getPreventiveMaintenances);
-router.get('/preventive/kpis', getPreventiveKpis);
-router.get('/preventive/history', getPreventiveHistory);
-router.get('/preventive/:id', getPreventiveMaintenanceById);
-router.post('/preventive', requireRole(['ADMIN', 'GL', 'SUPERVISEUR', 'TL']), createPreventiveMaintenance);
-router.put('/preventive/:id', requireRole(['ADMIN', 'GL', 'SUPERVISEUR', 'TL']), updatePreventiveMaintenance);
-router.delete('/preventive/:id', requireRole(['ADMIN', 'GL']), deletePreventiveMaintenance);
-router.patch('/preventive/:id/status', requireRole(['ADMIN', 'GL', 'SUPERVISEUR', 'TL', 'TECHNICIEN']), changeStatus);
-router.put('/preventive/:id/checklist', requireRole(['ADMIN', 'GL', 'SUPERVISEUR', 'TL', 'TECHNICIEN']), updateChecklist);
-router.post('/preventive/import/validate', requireRole(['ADMIN', 'GL', 'SUPERVISEUR']), validateImport);
-router.post('/preventive/import/confirm', requireRole(['ADMIN', 'GL', 'SUPERVISEUR']), confirmImport);
+router.get('/preventive', requirePermission('PREVENTIVE_VIEW'), getPreventiveMaintenances);
+router.get('/preventive/kpis', requirePermission('PREVENTIVE_VIEW'), getPreventiveKpis);
+router.get('/preventive/history', requirePermission('PREVENTIVE_VIEW'), getPreventiveHistory);
+router.get('/preventive/:id', requirePermission('PREVENTIVE_VIEW'), getPreventiveMaintenanceById);
+router.post('/preventive', requirePermission('PREVENTIVE_CREATE'), createPreventiveMaintenance);
+router.put('/preventive/:id', requirePermission('PREVENTIVE_EDIT'), updatePreventiveMaintenance);
+router.delete('/preventive/:id', requirePermission('PREVENTIVE_DELETE'), deletePreventiveMaintenance);
+router.patch('/preventive/:id/status', requirePermission('PREVENTIVE_EDIT'), changeStatus);
+router.put('/preventive/:id/checklist', requirePermission('PREVENTIVE_EDIT'), updateChecklist);
+router.post('/preventive/import/validate', requirePermission('PREVENTIVE_CREATE'), validateImport);
+router.post('/preventive/import/confirm', requirePermission('PREVENTIVE_CREATE'), confirmImport);
 
 module.exports = router;

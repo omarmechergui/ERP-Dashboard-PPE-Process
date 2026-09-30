@@ -8,7 +8,38 @@ const stockService = require('../services/stock/stockService');
 // @access  Private
 const getKpis = async (req, res, next) => {
   try {
-    const kpiData = await getSharedMaintenanceKpis();
+    const { period } = req.query;
+    let dateFrom = null;
+    let dateTo = new Date();
+    
+    if (period === 'today') {
+      dateFrom = new Date();
+      dateFrom.setHours(0, 0, 0, 0);
+    } else if (period === 'week') {
+      dateFrom = new Date();
+      dateFrom.setDate(dateFrom.getDate() - 7);
+      dateFrom.setHours(0, 0, 0, 0);
+    } else if (period === 'month') {
+      dateFrom = new Date();
+      dateFrom.setMonth(dateFrom.getMonth() - 1);
+      dateFrom.setHours(0, 0, 0, 0);
+    } else if (period === 'quarter') {
+      dateFrom = new Date();
+      dateFrom.setMonth(dateFrom.getMonth() - 3);
+      dateFrom.setHours(0, 0, 0, 0);
+    } else if (period === 'year') {
+      dateFrom = new Date();
+      dateFrom.setFullYear(dateFrom.getFullYear() - 1);
+      dateFrom.setHours(0, 0, 0, 0);
+    } else if (req.query.from && req.query.to) {
+      dateFrom = new Date(req.query.from);
+      dateTo = new Date(req.query.to);
+    } else {
+      dateFrom = null; // all time
+      dateTo = null;
+    }
+
+    const kpiData = await getSharedMaintenanceKpis(dateFrom, dateTo);
 
     res.json({
       success: true,
@@ -34,6 +65,7 @@ const getInterventions = async (req, res, next) => {
 
     const interventions = await prisma.intervention.findMany({
       where,
+      take: 500,
       include: {
         machine: true,
         technicien: true,
@@ -55,6 +87,7 @@ const getInterventions = async (req, res, next) => {
       preventivePlanId: int.preventivePlanId,
       preventivePlan: int.preventivePlan ? { id: int.preventivePlan.id, code: int.preventivePlan.code } : null,
       type: int.type,
+      kpiType: int.kpiType,
       priority: int.priority,
       status: int.status,
       shift: int.shift,
@@ -82,8 +115,7 @@ const getInterventions = async (req, res, next) => {
         interventions: formatted,
         timeline: formatted.map(int => ({
            id: int.id, code: int.code, 
-           gridCells: Array(7).fill(false).map((_, i) => i === new Date(int.createdAt).getDay()), 
-           color: (int.status === 'TERMINÉE' || int.status === 'Clôturée') ? 'success' : (int.status === 'EN_COURS' || int.status === 'En cours') ? 'warning' : 'danger'
+           color: (int.status === 'Clôturée' || int.status === 'TERMINÉE') ? 'success' : (int.status === 'En cours' || int.status === 'EN_COURS') ? 'warning' : 'danger'
         }))
       }
     });
@@ -127,6 +159,7 @@ const getInterventionById = async (req, res, next) => {
       preventivePlanId: intervention.preventivePlanId,
       preventivePlan: intervention.preventivePlan ? { id: intervention.preventivePlan.id, code: intervention.preventivePlan.code } : null,
       type: intervention.type,
+      kpiType: intervention.kpiType,
       priority: intervention.priority,
       status: intervention.status,
       shift: intervention.shift,
@@ -167,7 +200,7 @@ const getInterventionById = async (req, res, next) => {
 const createIntervention = async (req, res, next) => {
   try {
     const { 
-      title, description, defaut, type, priority, status, shift, action, 
+      title, description, defaut, type, kpiType, priority, status, shift, action, 
       machineId, technicienId, preventivePlanId, downtime, 
       plannedStart, plannedEnd, startDate, endDate 
     } = req.body;
@@ -198,12 +231,36 @@ const createIntervention = async (req, res, next) => {
       validTechnicienId = technicienId;
     }
 
+    if (downtime !== undefined && downtime !== null && downtime !== '') {
+      const parsedDowntime = parseFloat(downtime);
+      if (parsedDowntime < 0) {
+        return res.status(400).json({ success: false, error: "Le temps d'arrêt ne peut pas être négatif." });
+      }
+    }
+
+    if (machineId) {
+      const machine = await prisma.machine.findUnique({ where: { id: machineId } });
+      if (!machine) {
+        return res.status(400).json({ success: false, error: "La machine ou panneau spécifié n'existe pas." });
+      }
+    }
+
+    let finalKpiType = null;
+    if (kpiType !== undefined && kpiType !== null && kpiType !== '') {
+      if (kpiType !== 'MTTR' && kpiType !== 'MTBF') {
+        return res.status(400).json({ success: false, error: "kpiType invalide. Doit être 'MTTR' ou 'MTBF'." });
+      }
+      finalKpiType = kpiType;
+    } else {
+      return res.status(400).json({ success: false, error: 'Le champ "KPI concerné" est obligatoire.' });
+    }
+
     // Generate a unique code server-side
     const { nextSeq } = require('../helpers/counterHelper');
     const nextNum = await nextSeq(prisma, 'intervention');
     const code = `INT-${String(nextNum).padStart(5, '0')}`;
 
-    const initialStatus = status || 'PLANIFIÉE'; // default CMMS status
+    const initialStatus = status || 'En attente'; // standardized CMMS status
 
     const intervention = await prisma.intervention.create({
       data: {
@@ -212,6 +269,7 @@ const createIntervention = async (req, res, next) => {
         description: finalDescription.trim(),
         defaut: finalDescription.trim(), // keep for legacy
         type: type || 'Corrective',
+        kpiType: finalKpiType,
         priority: priority || 'Normal',
         status: initialStatus,
         shift: shift || null,
@@ -251,7 +309,7 @@ const calculateDowntime = (startDate, endDate) => {
 const updateIntervention = async (req, res, next) => {
   try {
     const { 
-      title, description, defaut, type, priority, status, shift, action, 
+      title, description, defaut, type, kpiType, priority, status, shift, action, 
       machineId, technicienId, downtime, plannedStart, plannedEnd, 
       cause, result, observations 
     } = req.body;
@@ -268,6 +326,15 @@ const updateIntervention = async (req, res, next) => {
       data.defaut = finalDescription.trim();
     }
     if (type !== undefined) data.type = type;
+    if (kpiType !== undefined) {
+      if (kpiType === null || kpiType === '') {
+        data.kpiType = null;
+      } else if (kpiType === 'MTTR' || kpiType === 'MTBF') {
+        data.kpiType = kpiType;
+      } else {
+        return res.status(400).json({ success: false, error: "kpiType invalide. Doit être 'MTTR' ou 'MTBF'." });
+      }
+    }
     if (priority !== undefined) data.priority = priority;
     if (status !== undefined) data.status = status;
     if (shift !== undefined) data.shift = shift || null;
@@ -305,7 +372,11 @@ const updateIntervention = async (req, res, next) => {
     if (plannedEnd !== undefined) data.plannedEnd = plannedEnd ? new Date(plannedEnd) : null;
 
     if (downtime !== undefined && downtime !== null && downtime !== '') {
-      data.downtime = parseFloat(downtime);
+      const parsedDowntime = parseFloat(downtime);
+      if (parsedDowntime < 0) {
+        return res.status(400).json({ success: false, error: "Le temps d'arrêt ne peut pas être négatif." });
+      }
+      data.downtime = parsedDowntime;
     }
 
     const intervention = await prisma.intervention.update({
@@ -335,7 +406,7 @@ const startIntervention = async (req, res, next) => {
     const intervention = await prisma.intervention.update({
       where: { id: interventionId },
       data: {
-        status: 'EN_COURS',
+        status: 'En cours',
         actualStart: new Date(),
         startDate: new Date(), // legacy
       }
@@ -367,7 +438,7 @@ const completeIntervention = async (req, res, next) => {
     }
 
     const data = {
-      status: 'TERMINÉE',
+      status: 'Clôturée',
       actualEnd: now,
       endDate: now, // legacy
       interventionDuration: duration,
@@ -407,7 +478,7 @@ const cancelIntervention = async (req, res, next) => {
     const intervention = await prisma.intervention.update({
       where: { id: interventionId },
       data: {
-        status: 'ANNULÉE',
+        status: 'Annulée',
         observations: reason ? `Annulée: ${reason}` : 'Annulée sans motif'
       }
     });
@@ -478,10 +549,10 @@ const changeInterventionStatus = async (req, res, next) => {
     // Status transition enforcement
     const currentStatus = existing.status;
     const validTransitions = {
-       'PLANIFIÉE': ['EN_COURS', 'ANNULÉE', 'En cours', 'Annulée'],
-       'En attente': ['EN_COURS', 'ANNULÉE', 'En cours', 'Annulée'],
-       'EN_COURS': ['TERMINÉE', 'En attente', 'Clôturée', 'ANNULÉE'],
-       'En cours': ['TERMINÉE', 'En attente', 'Clôturée', 'ANNULÉE'],
+       'PLANIFIÉE': ['EN_COURS', 'ANNULÉE', 'En cours', 'Annulée', 'Clôturée', 'TERMINÉE'], // legacy support
+       'En attente': ['En cours', 'Annulée', 'Clôturée'],
+       'EN_COURS': ['TERMINÉE', 'En attente', 'Clôturée', 'ANNULÉE', 'En cours', 'Annulée'], // legacy support
+       'En cours': ['Clôturée', 'En attente', 'Annulée'],
        'TERMINÉE': [],
        'Clôturée': [],
        'ANNULÉE': [],
@@ -518,8 +589,22 @@ const changeInterventionStatus = async (req, res, next) => {
 // @access  Private
 const deleteIntervention = async (req, res, next) => {
   try {
+    const interventionId = req.params.id;
+
+    // P0: Check for consumed stock parts
+    const partsCount = await prisma.interventionPart.count({
+      where: { interventionId }
+    });
+
+    if (partsCount > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Impossible de supprimer cette intervention car des pièces de rechange ont déjà été consommées et déduites du stock. Pour annuler, changez plutôt le statut à 'Annulée'." 
+      });
+    }
+
     await prisma.intervention.delete({
-      where: { id: req.params.id }
+      where: { id: interventionId }
     });
 
     res.json({ success: true, message: "Intervention deleted" });

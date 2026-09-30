@@ -11,31 +11,43 @@ export default function InterventionFilters({
   machines = [],
   technicians = []
 }) {
+  const hasActiveFilters = 
+    (filters.type && filters.type !== 'Tous') ||
+    (filters.kpiType && filters.kpiType !== 'Tous') ||
+    (filters.priority && filters.priority !== 'Tous') ||
+    (filters.status && filters.status !== 'Tous') ||
+    (filters.shift && filters.shift !== 'Tous') ||
+    searchQuery.trim().length > 0;
+
   return (
-    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col gap-4">
+    <div className="bg-card rounded-2xl shadow-sm border border-border p-4 mb-6 flex flex-col gap-4 animate-slide-up">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Search Input */}
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             type="text"
             placeholder="Rechercher par code, machine, technicien..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="w-full pl-10 pr-4 py-2.5 bg-background border border-input rounded-xl text-sm font-medium text-foreground placeholder:text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
           />
         </div>
         
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={onReset}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
-          >
-            <X className="w-4 h-4" />
-            Réinitialiser
-          </button>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3">
+          {hasActiveFilters && (
+            <button 
+              onClick={onReset}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-secondary-foreground bg-secondary hover:bg-secondary/80 hover:text-foreground rounded-xl transition-all"
+            >
+              <X className="w-4 h-4" />
+              Réinitialiser
+            </button>
+          )}
           <button 
             onClick={onRefresh}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary-hover rounded-xl transition-all shadow-sm hover:shadow"
           >
             <RefreshCw className="w-4 h-4" />
             Actualiser
@@ -43,12 +55,19 @@ export default function InterventionFilters({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-[150px]">
+      {/* Filters Row */}
+      <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border">
+        <div className="flex items-center gap-2 mr-2">
+          <Filter className="w-4 h-4 text-muted" />
+          <span className="text-sm font-semibold text-secondary-foreground uppercase tracking-wider">Filtres</span>
+        </div>
+
+        <div className="flex-1 min-w-[140px] max-w-[200px]">
           <select
             value={filters.type || 'Tous'}
             onChange={(e) => onFilterChange({ type: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer bg-white"
+            className="w-full px-3.5 py-2.5 text-sm font-medium bg-background border border-input rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-foreground appearance-none shadow-sm cursor-pointer"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
           >
             <option value="Tous">Tous les types</option>
             <option value="Preventive">Préventive</option>
@@ -58,11 +77,26 @@ export default function InterventionFilters({
           </select>
         </div>
 
-        <div className="flex-1 min-w-[150px]">
+        <div className="flex-1 min-w-[140px] max-w-[200px]">
+          <select
+            value={filters.kpiType || 'Tous'}
+            onChange={(e) => onFilterChange({ kpiType: e.target.value })}
+            className="w-full px-3.5 py-2.5 text-sm font-medium bg-background border border-input rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-foreground appearance-none shadow-sm cursor-pointer"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+          >
+            <option value="Tous">Tous les KPI</option>
+            <option value="MTTR">MTTR</option>
+            <option value="MTBF">MTBF</option>
+            <option value="None">Non défini</option>
+          </select>
+        </div>
+
+        <div className="flex-1 min-w-[140px] max-w-[200px]">
           <select
             value={filters.priority || 'Tous'}
             onChange={(e) => onFilterChange({ priority: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer bg-white"
+            className="w-full px-3.5 py-2.5 text-sm font-medium bg-background border border-input rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-foreground appearance-none shadow-sm cursor-pointer"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
           >
             <option value="Tous">Toutes les priorités</option>
             <option value="Low">Basse</option>
@@ -72,11 +106,12 @@ export default function InterventionFilters({
           </select>
         </div>
 
-        <div className="flex-1 min-w-[150px]">
+        <div className="flex-1 min-w-[140px] max-w-[200px]">
           <select
             value={filters.status || 'Tous'}
             onChange={(e) => onFilterChange({ status: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer bg-white"
+            className="w-full px-3.5 py-2.5 text-sm font-medium bg-background border border-input rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-foreground appearance-none shadow-sm cursor-pointer"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
           >
             <option value="Tous">Tous les statuts</option>
             <option value="Planned">Planifié</option>
@@ -87,16 +122,17 @@ export default function InterventionFilters({
           </select>
         </div>
 
-        <div className="flex-1 min-w-[150px]">
+        <div className="flex-1 min-w-[140px] max-w-[200px]">
           <select
             value={filters.shift || 'Tous'}
             onChange={(e) => onFilterChange({ shift: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer bg-white"
+            className="w-full px-3.5 py-2.5 text-sm font-medium bg-background border border-input rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-foreground appearance-none shadow-sm cursor-pointer"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
           >
             <option value="Tous">Tous les shifts</option>
-            <option value="Matin">A</option>
-            <option value="Après-midi">B</option>
-            <option value="Nuit">C</option>
+            <option value="Matin">A (Matin)</option>
+            <option value="Après-midi">B (Après-midi)</option>
+            <option value="Nuit">C (Nuit)</option>
           </select>
         </div>
       </div>

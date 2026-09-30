@@ -1,40 +1,70 @@
 const prisma = require('../config/db');
 
-const getSharedMaintenanceKpis = async () => {
-  const totalInterventions = await prisma.intervention.count();
+const getSharedMaintenanceKpis = async (dateFrom, dateTo) => {
+  const baseWhere = {};
+  if (dateFrom && dateTo) {
+    baseWhere.createdAt = { gte: dateFrom, lte: dateTo };
+  } else if (dateFrom) {
+    baseWhere.createdAt = { gte: dateFrom };
+  } else if (dateTo) {
+    baseWhere.createdAt = { lte: dateTo };
+  }
+
+  const totalInterventions = await prisma.intervention.count({ where: baseWhere });
   
   const completedInterventions = await prisma.intervention.count({
-    where: { status: { in: ['Clôturée', 'TERMINÉE'] } }
+    where: { ...baseWhere, status: { in: ['Clôturée', 'TERMINÉE'] } }
   });
   
   const inProgressInterventions = await prisma.intervention.count({
-    where: { status: { in: ['En cours', 'EN_COURS'] } }
+    where: { ...baseWhere, status: { in: ['En cours', 'EN_COURS'] } }
   });
 
   const openInterventions = await prisma.intervention.count({
-    where: { status: { in: ['En attente', 'PLANIFIÉE'] } }
+    where: { ...baseWhere, status: { in: ['En attente', 'PLANIFIÉE'] } }
   });
 
   // Preventive Ratio
   const preventiveInterventions = await prisma.intervention.count({
-    where: { type: { in: ['Préventive', 'PREVENTIVE'] } }
+    where: { ...baseWhere, type: { in: ['Préventive', 'PREVENTIVE'] } }
   });
   const preventiveRatio = totalInterventions > 0 ? ((preventiveInterventions / totalInterventions) * 100).toFixed(1) : 0;
 
   // Calculate MTTR in hours
-  const completedWithTime = await prisma.intervention.findMany({
+  const eligibleMttrInterventions = await prisma.intervention.count({
     where: { 
-      status: { in: ['Clôturée', 'TERMINÉE'] },
-      downtime: { not: null }
+      ...baseWhere,
+      OR: [
+        { kpiType: 'MTTR' },
+        { kpiType: null, type: 'Corrective' }
+      ],
+      status: { in: ['Clôturée', 'TERMINÉE'] }
     }
   });
 
-  let mttr = null;
+  const completedWithTime = await prisma.intervention.findMany({
+    where: { 
+      ...baseWhere,
+      OR: [
+        { kpiType: 'MTTR' },
+        { kpiType: null, type: 'Corrective' }
+      ],
+      status: { in: ['Clôturée', 'TERMINÉE'] },
+      downtime: { not: null, gt: 0, lte: 720 }
+    }
+  });
+
+  let mttr = "N/A";
+  let mttrQuality = { qualityPercentage: 0, validCount: 0, eligibleCount: eligibleMttrInterventions };
+  
   if (completedWithTime.length > 0) {
     const totalDowntime = completedWithTime.reduce((sum, curr) => sum + curr.downtime, 0);
-    mttr = (totalDowntime / completedWithTime.length).toFixed(2);
-  } else {
-    mttr = "N/A";
+    mttr = totalDowntime.toFixed(2);
+  }
+  
+  if (eligibleMttrInterventions > 0) {
+    mttrQuality.validCount = completedWithTime.length;
+    mttrQuality.qualityPercentage = Math.round((completedWithTime.length / eligibleMttrInterventions) * 100);
   }
 
   // MTTR Data per month (last 6 months)
@@ -61,6 +91,7 @@ const getSharedMaintenanceKpis = async () => {
   // ABC Data (Priority distribution)
   const priorityCounts = await prisma.intervention.groupBy({
     by: ['priority'],
+    where: baseWhere,
     _count: { priority: true }
   });
 
@@ -90,6 +121,7 @@ const getSharedMaintenanceKpis = async () => {
 
   // Heatmap Data (from actual Interventions)
   const allInterventions = await prisma.intervention.findMany({
+    where: baseWhere,
     select: { createdAt: true }
   });
 
@@ -115,31 +147,46 @@ const getSharedMaintenanceKpis = async () => {
   }
 
   // Calculate Best-Effort MTBF based on time between failures per machine
-  const allCorrective = await prisma.intervention.findMany({
-    where: { type: 'Corrective', machineId: { not: null } },
-    orderBy: { createdAt: 'asc' },
-    select: { machineId: true, createdAt: true }
-  });
-
-  let totalMtbfHours = 0;
-  let mtbfIntervalCount = 0;
-
-  const machineLastFailure = {};
-  allCorrective.forEach(int => {
-    if (machineLastFailure[int.machineId]) {
-      const diffHours = (new Date(int.createdAt) - new Date(machineLastFailure[int.machineId])) / (1000 * 60 * 60);
-      if (diffHours > 0) {
-        totalMtbfHours += diffHours;
-        mtbfIntervalCount++;
-      }
+  const eligibleMtbfInterventions = await prisma.intervention.count({
+    where: { 
+      ...baseWhere,
+      OR: [
+        { kpiType: 'MTBF' },
+        { kpiType: null, type: 'Corrective' }
+      ],
+      status: { in: ['Clôturée', 'TERMINÉE'] }
     }
-    machineLastFailure[int.machineId] = int.createdAt;
   });
 
-  const mtbf = mtbfIntervalCount > 0 ? (totalMtbfHours / mtbfIntervalCount).toFixed(1) : "N/A";
+  const mtbfInterventions = await prisma.intervention.findMany({
+    where: { 
+      ...baseWhere,
+      OR: [
+        { kpiType: 'MTBF' },
+        { kpiType: null, type: 'Corrective' }
+      ],
+      status: { in: ['Clôturée', 'TERMINÉE'] },
+      downtime: { not: null, gt: 0 }
+    }
+  });
+
+  let mtbf = "N/A";
+  if (mtbfInterventions.length > 0) {
+    const totalMtbfDowntime = mtbfInterventions.reduce((sum, curr) => sum + curr.downtime, 0);
+    mtbf = totalMtbfDowntime.toFixed(2);
+  }
+  
+  let mtbfQuality = { qualityPercentage: 0, validCount: mtbfInterventions.length, eligibleCount: eligibleMtbfInterventions };
+  if (eligibleMtbfInterventions > 0) {
+    mtbfQuality.qualityPercentage = Math.round((mtbfInterventions.length / eligibleMtbfInterventions) * 100);
+  }
+
   const disponibilite = null; // Still needs operational hours to compute accurately
 
   const interventionsMois = currMonthTotal;
+
+  const mttrDisplay = mttr !== "N/A" ? `${mttr}h` : "N/A";
+  const mtbfDisplay = mtbf !== "N/A" ? `${mtbf}h` : "N/A";
 
   return {
     totalInterventions,
@@ -147,8 +194,10 @@ const getSharedMaintenanceKpis = async () => {
     inProgressInterventions,
     openInterventions,
     preventiveRatio,
-    mttr,
-    mtbf,
+    mttr: mttrDisplay,
+    mttrQuality,
+    mtbf: mtbfDisplay,
+    mtbfQuality,
     disponibilite,
     interventionsMois,
     mttrData: {

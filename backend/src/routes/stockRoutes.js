@@ -17,33 +17,33 @@ const {
   searchArticlesLight,
   getArticlesByIds
 } = require('../controllers/stockController');
-const { protect } = require('../middlewares/auth');
-const requireRole = require('../middlewares/role');
+const { protect, requirePermission } = require('../middlewares/auth');
 
 const router = express.Router();
 
 router.use(protect);
+router.use(requirePermission('STOCK_VIEW'));
 
-// Articles Reading (All roles)
+// Articles Reading
 router.get('/articles/search', searchArticlesLight);
 router.post('/articles/by-ids', getArticlesByIds);
 router.get('/articles', getArticles);
 router.get('/articles/:id', getArticleById);
 router.get('/articles/:id/consumption', getArticleConsumption);
 
-// Articles Mutation (GL & Admin)
-router.post('/articles', requireRole(['GL', 'ADMIN']), createArticle);
-router.put('/articles/:id', requireRole(['GL', 'ADMIN']), updateArticle);
-router.delete('/articles/:id', requireRole(['GL', 'ADMIN']), deleteArticle);
+// Articles Mutation
+router.post('/articles', requirePermission('STOCK_CREATE'), createArticle);
+router.put('/articles/:id', requirePermission('STOCK_EDIT'), updateArticle);
+router.delete('/articles/:id', requirePermission('STOCK_DELETE'), deleteArticle);
 
-// Movements (Operator, GL, Admin)
-router.post('/entrees', requireRole(['OPERATEUR', 'GL', 'ADMIN']), stockEntree);
-router.post('/sorties', requireRole(['OPERATEUR', 'GL', 'ADMIN']), stockSortie);
-router.post('/sorties/bulk', requireRole(['OPERATEUR', 'GL', 'ADMIN']), stockSortieBulk);
+// Movements
+router.post('/entrees', requirePermission('STOCK_MOVEMENT_MANAGE'), stockEntree);
+router.post('/sorties', requirePermission('STOCK_MOVEMENT_MANAGE'), stockSortie);
+router.post('/sorties/bulk', requirePermission('STOCK_MOVEMENT_MANAGE'), stockSortieBulk);
 router.get('/mouvements', getMouvements);
 router.get('/mouvements/stats', getMovementStats);
-router.get('/export', exportStock);
-router.post('/import', requireRole(['OPERATEUR', 'GL', 'ADMIN']), importStockMovements);
-router.post('/import/batch', requireRole(['OPERATEUR', 'GL', 'ADMIN']), importStockBatch);
+router.get('/export', requirePermission('STOCK_EXPORT'), exportStock);
+router.post('/import', requirePermission('STOCK_IMPORT'), importStockMovements);
+router.post('/import/batch', requirePermission('STOCK_IMPORT'), importStockBatch);
 
 module.exports = router;

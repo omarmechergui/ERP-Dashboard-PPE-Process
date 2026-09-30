@@ -6,7 +6,8 @@ export default function KPICard({
   icon: Icon, 
   trend, 
   trendLabel,
-  color = "blue"
+  color = "blue",
+  qualityData
 }) {
   const colorMap = {
     blue: "bg-blue-50 text-blue-600 border-blue-200",
@@ -43,6 +44,27 @@ export default function KPICard({
           )}
         </div>
       </div>
+
+      {qualityData && (
+        <div 
+          className="mt-4 pt-4 border-t border-border group/tooltip relative cursor-help"
+          title={qualityData.tooltip}
+        >
+          <div className="flex justify-between text-xs font-semibold text-secondary-foreground mb-1.5">
+            <span className="uppercase tracking-wider">Qualité des données</span>
+            <span className="text-foreground">{qualityData.percentage}%</span>
+          </div>
+          <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-1.5">
+            <div 
+              className={`h-full rounded-full ${iconColorClass.split(' ')[1].replace('text-', 'bg-')}`} 
+              style={{ width: `${qualityData.percentage}%` }}
+            />
+          </div>
+          <p className="text-[10px] font-bold text-muted text-right uppercase tracking-wider">
+            {qualityData.valid} / {qualityData.eligible} {qualityData.eligibleLabel || 'valid'}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

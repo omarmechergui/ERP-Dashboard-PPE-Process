@@ -34,16 +34,30 @@ export default function InterventionKPIs({ stats }) {
         color="red"
       />
       <KPICard
-        title="Temps Moyen Rép. (MTTR)"
-        value={stats.mttr || "0h"}
+        title="MTTR"
+        value={stats.mttr ? stats.mttr.replace('h', ' min') : "0 min"}
         icon={Timer}
         color="amber"
+        qualityData={stats.mttrQuality ? {
+          percentage: stats.mttrQuality.qualityPercentage || 0,
+          valid: stats.mttrQuality.validCount || 0,
+          eligible: stats.mttrQuality.eligibleCount || 0,
+          eligibleLabel: 'interventions',
+          tooltip: 'Pourcentage des interventions éligibles disposant des données nécessaires au calcul du MTTR.'
+        } : null}
       />
       <KPICard
-        title="Temps Moyen Rép. (Réponse)"
-        value={stats.avgResponse || "0m"}
+        title="MTBF"
+        value={stats.mtbf ? stats.mtbf.replace('h', ' min') : "0 min"}
         icon={Clock}
         color="indigo"
+        qualityData={stats.mtbfQuality ? {
+          percentage: stats.mtbfQuality.qualityPercentage || 0,
+          valid: stats.mtbfQuality.validCount || 0,
+          eligible: stats.mtbfQuality.eligibleCount || 0,
+          eligibleLabel: 'éligibles',
+          tooltip: 'Pourcentage des données éligibles disposant des informations nécessaires au calcul du MTBF.'
+        } : null}
       />
       <KPICard
         title="Taux de Complétion"
@@ -51,12 +65,7 @@ export default function InterventionKPIs({ stats }) {
         icon={Percent}
         color="emerald"
       />
-      <KPICard
-        title="Disponibilité Machine"
-        value={stats.availability || "0%"}
-        icon={Power}
-        color="blue"
-      />
+      
     </div>
   );
 }

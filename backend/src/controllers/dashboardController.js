@@ -189,7 +189,38 @@ const getMouvementsStockStats = async (req, res, next) => {
 // @access  Private
 const getMaintenanceKpis = async (req, res, next) => {
   try {
-    const kpiData = await getSharedMaintenanceKpis();
+    const { period } = req.query;
+    let dateFrom = null;
+    let dateTo = new Date();
+    
+    if (period === 'today') {
+      dateFrom = new Date();
+      dateFrom.setHours(0, 0, 0, 0);
+    } else if (period === 'week') {
+      dateFrom = new Date();
+      dateFrom.setDate(dateFrom.getDate() - 7);
+      dateFrom.setHours(0, 0, 0, 0);
+    } else if (period === 'month') {
+      dateFrom = new Date();
+      dateFrom.setMonth(dateFrom.getMonth() - 1);
+      dateFrom.setHours(0, 0, 0, 0);
+    } else if (period === 'quarter') {
+      dateFrom = new Date();
+      dateFrom.setMonth(dateFrom.getMonth() - 3);
+      dateFrom.setHours(0, 0, 0, 0);
+    } else if (period === 'year') {
+      dateFrom = new Date();
+      dateFrom.setFullYear(dateFrom.getFullYear() - 1);
+      dateFrom.setHours(0, 0, 0, 0);
+    } else if (req.query.from && req.query.to) {
+      dateFrom = new Date(req.query.from);
+      dateTo = new Date(req.query.to);
+    } else {
+      dateFrom = null; // all time
+      dateTo = null;
+    }
+
+    const kpiData = await getSharedMaintenanceKpis(dateFrom, dateTo);
     
     // Removed fake planning timeline as per business requirements.
     // Dashboard will receive the kpiData directly.

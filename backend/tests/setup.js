@@ -11,7 +11,7 @@ process.env.NODE_ENV = 'test';
 const schemaPath = path.resolve(__dirname, '../prisma/schema.prisma');
 
 try {
-  execSync(`npx prisma db push --schema="${schemaPath}" --accept-data-loss --skip-generate`, {
+  execSync(`npx.cmd prisma db push --schema="${schemaPath}" --accept-data-loss --skip-generate`, {
     env: {
       ...process.env,
       DATABASE_URL: process.env.DATABASE_URL_TEST || 'mongodb://localhost:27017/test_db'

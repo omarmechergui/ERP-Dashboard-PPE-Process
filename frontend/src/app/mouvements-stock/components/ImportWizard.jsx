@@ -198,15 +198,83 @@ export const ImportWizard = ({ isOpen, onClose, onRefresh, user }) => {
     cancelledRef.current = true;
   };
 
-  const downloadErrors = () => {
-    if (importStats.errors.length === 0 && (!previewData || previewData.failedCount === 0)) return;
-    
-    const errorsToDownload = importStats.errors.length > 0 ? importStats.errors : previewData.failedRows;
+  const downloadTemplate = () => {
+    const headers = ["Article Code", "Quantity", "Location", "Fournisseur ID"];
+    const exampleRow = ["A001", 10, "MAGASIN-01", ""];
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, exampleRow]);
+
+    // Style header row
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "1E40AF" } },
+      alignment: { horizontal: "center" }
+    };
+    headers.forEach((_, colIdx) => {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c: colIdx });
+      if (ws[cellRef]) ws[cellRef].s = headerStyle;
+    });
+
+    // Style example row (light grey italic)
+    const exampleStyle = {
+      font: { italic: true, color: { rgb: "6B7280" } },
+      fill: { fgColor: { rgb: "F3F4F6" } }
+    };
+    headers.forEach((_, colIdx) => {
+      const cellRef = XLSX.utils.encode_cell({ r: 1, c: colIdx });
+      if (ws[cellRef]) ws[cellRef].s = exampleStyle;
+    });
+
+    ws['!cols'] = [
+      { wch: 18 },  // Article Code
+      { wch: 12 },  // Quantity
+      { wch: 18 },  // Location
+      { wch: 18 }   // Fournisseur ID
+    ];
+
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(errorsToDownload);
-    ws['!cols'] = Object.keys(errorsToDownload[0] || {}).map(() => ({ wch: 20 }));
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "stock-import-template.xlsx");
+  };
+
+  const downloadErrors = () => {
+    // During Step 4 (post-import), use importStats.errors if available
+    const postImportErrors = importStats?.errors || [];
+    
+    // During Step 2 (preview), extract error rows from previewRows
+    // The backend returns errors embedded in previewRows with Status === "Error"
+    const previewErrorRows = (previewData?.previewRows || [])
+      .filter(row => row.Status === "Error");
+    
+    // Prefer post-import errors (Step 4), fallback to preview errors (Step 2)
+    const sourceErrors = postImportErrors.length > 0 ? postImportErrors : previewErrorRows;
+    
+    if (!sourceErrors || sourceErrors.length === 0) return;
+
+    // Format error rows for clean Excel export
+    const exportData = sourceErrors.map((row, idx) => ({
+      "N°": row.row || idx + 1,
+      "Code Article": row["Article Code"] || row.data?.["Article Code"] || "-",
+      "Nom Article": row["Article Name"] || row.data?.["Article Name"] || "-",
+      "Quantité": row["Quantity"] || row.data?.["Quantity"] || "-",
+      "Emplacement": row["Location"] || row.data?.["Location"] || "-",
+      "Erreur": row.Error || row.error || "-"
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    ws['!cols'] = [
+      { wch: 6 },   // N°
+      { wch: 16 },  // Code Article
+      { wch: 30 },  // Nom Article
+      { wch: 12 },  // Quantité
+      { wch: 16 },  // Emplacement
+      { wch: 50 }   // Erreur
+    ];
     XLSX.utils.book_append_sheet(wb, ws, "Erreurs");
-    XLSX.writeFile(wb, "import_erreurs.xlsx");
+    
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `stock-import-errors-${date}.xlsx`);
   };
 
   const reset = () => {
@@ -265,6 +333,22 @@ export const ImportWizard = ({ isOpen, onClose, onRefresh, user }) => {
           <div className="p-6 overflow-y-auto flex-1">
             {step === 1 && (
               <div className="space-y-4 max-w-2xl mx-auto">
+                {/* Template Download */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                  <p className="text-sm text-slate-600 mb-3">
+                    Téléchargez le modèle Excel, remplissez les données requises, puis importez votre fichier.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={downloadTemplate}
+                    className="px-4 py-2.5 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-700 hover:bg-slate-100 hover:border-slate-300 flex items-center gap-2 font-medium text-sm transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
+                    Télécharger le template Excel
+                  </button>
+                </div>
+
+                {/* File Upload Zone */}
                 <div 
                   className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${file ? 'border-emerald-500 bg-emerald-50' : 'border-slate-300 hover:border-slate-400 bg-slate-50'}`}
                   onClick={() => fileInputRef.current?.click()}
@@ -322,8 +406,8 @@ export const ImportWizard = ({ isOpen, onClose, onRefresh, user }) => {
                       <AlertCircle className="h-5 w-5 shrink-0" />
                       <p>Certaines lignes contiennent des erreurs et <strong>ne seront pas importées</strong>.</p>
                     </div>
-                    <button onClick={downloadErrors} className="mt-2 px-4 py-2 bg-white border border-amber-200 rounded-lg shadow-sm text-amber-700 hover:bg-amber-100 flex items-center gap-2">
-                      <Download className="h-4 w-4" /> Télécharger les erreurs
+                    <button onClick={downloadErrors} className="mt-2 px-4 py-2 bg-white border border-amber-200 rounded-lg shadow-sm text-amber-700 hover:bg-amber-100 flex items-center gap-2 font-medium">
+                      <Download className="h-4 w-4" /> Télécharger les erreurs ({previewData.failedCount})
                     </button>
                   </div>
                 )}

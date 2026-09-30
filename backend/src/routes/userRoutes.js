@@ -11,8 +11,7 @@ const {
   uploadUserPhoto,
   getUserAuditLogs
 } = require('../controllers/userController');
-const { protect } = require('../middlewares/auth');
-const requireRole = require('../middlewares/role');
+const { protect, requirePermission } = require('../middlewares/auth');
 
 const router = express.Router();
 
@@ -62,20 +61,20 @@ router.get('/team', getTeamUsers);
 router.get('/organization', getOrganizationData);
 
 // Audit logs (ADMIN only)
-router.get('/audit', requireRole(['ADMIN']), getUserAuditLogs);
+router.get('/audit', requirePermission('USERS_VIEW'), getUserAuditLogs);
 
 // Photo upload (ADMIN only)
-router.post('/:id/photo', requireRole(['ADMIN']), upload.single('photo'), uploadUserPhoto);
+router.post('/:id/photo', requirePermission('USERS_EDIT'), upload.single('photo'), uploadUserPhoto);
 
 // User CRUD (ADMIN only)
-router.use(requireRole(['ADMIN']));
+router.use(requirePermission('USERS_VIEW'));
 
 router.route('/')
   .get(getUsers)
-  .post(createUser);
+  .post(requirePermission('USERS_CREATE'), createUser);
 
 router.route('/:id')
-  .put(updateUser)
-  .delete(deleteUser);
+  .put(requirePermission('USERS_EDIT'), updateUser)
+  .delete(requirePermission('USERS_DELETE'), deleteUser);
 
 module.exports = router;

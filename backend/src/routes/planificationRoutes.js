@@ -16,12 +16,12 @@ const {
   addPanneauToPlanification,
   removePanneauFromPlanification
 } = require('../controllers/planificationController');
-const { protect } = require('../middlewares/auth');
-const requireRole = require('../middlewares/role');
+const { protect, requirePermission } = require('../middlewares/auth');
 
 const router = express.Router();
 
 router.use(protect);
+router.use(requirePermission('PLANIFICATION_VIEW'));
 
 // Dashboard routes
 router.get('/dashboard', getDashboardStats);
@@ -33,21 +33,21 @@ router.get('/:id/panneaux', getPlanificationPanneaux);
 router.get('/:id/history', getPlanificationHistory);
 
 // Write routes
-router.post('/', requireRole(['GL', 'ADMIN']), createPlanification);
-router.put('/:id', requireRole(['GL', 'ADMIN']), updatePlanification);
+router.post('/', requirePermission('PLANIFICATION_CREATE'), createPlanification);
+router.put('/:id', requirePermission('PLANIFICATION_EDIT'), updatePlanification);
 
 // Transition routes
-router.post('/:id/planifier', requireRole(['GL', 'ADMIN']), planifierPlanification);
-router.post('/:id/start', requireRole(['GL', 'ADMIN']), startProduction);
-router.post('/:id/complete', requireRole(['GL', 'ADMIN']), completePlanification);
-router.post('/:id/cancel', requireRole(['GL', 'ADMIN', 'SUPERVISEUR']), cancelPlanification);
-router.patch('/:id/progress', requireRole(['GL', 'ADMIN', 'SUPERVISEUR']), updateProgress);
+router.post('/:id/planifier', requirePermission('PLANIFICATION_EDIT'), planifierPlanification);
+router.post('/:id/start', requirePermission('PLANIFICATION_EDIT'), startProduction);
+router.post('/:id/complete', requirePermission('PLANIFICATION_EDIT'), completePlanification);
+router.post('/:id/cancel', requirePermission('PLANIFICATION_EDIT'), cancelPlanification);
+router.patch('/:id/progress', requirePermission('PLANIFICATION_EDIT'), updateProgress);
 
 // Panneaux management
-router.post('/:id/panneaux', requireRole(['GL', 'ADMIN']), addPanneauToPlanification);
-router.delete('/:id/panneaux/:panneauId', requireRole(['GL', 'ADMIN']), removePanneauFromPlanification);
+router.post('/:id/panneaux', requirePermission('PLANIFICATION_EDIT'), addPanneauToPlanification);
+router.delete('/:id/panneaux/:panneauId', requirePermission('PLANIFICATION_EDIT'), removePanneauFromPlanification);
 
 // Delete route
-router.delete('/:id', requireRole(['GL', 'ADMIN']), deletePlanification);
+router.delete('/:id', requirePermission('PLANIFICATION_DELETE'), deletePlanification);
 
 module.exports = router;

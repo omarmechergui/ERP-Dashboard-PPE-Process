@@ -29,6 +29,8 @@ import {
   X
 } from "lucide-react";
 
+const { PERMISSIONS, hasPermission } = require("../../lib/permissions");
+
 // ──────────────────────────────────────────────
 // Constants
 // ──────────────────────────────────────────────
@@ -48,7 +50,7 @@ const menuGroups = [
         name: "Dashboard",
         path: "/dashboard",
         icon: LayoutDashboard,
-        roles: ["ADMIN", "GL", "SUPERVISEUR", "OPERATEUR"],
+        permission: PERMISSIONS.DASHBOARD_VIEW,
       },
     ],
   },
@@ -59,13 +61,13 @@ const menuGroups = [
         name: "Stock",
         path: "/stock",
         icon: Boxes,
-        roles: ["ADMIN", "GL", "SUPERVISEUR", "OPERATEUR"],
+        permission: PERMISSIONS.STOCK_VIEW,
       },
       {
         name: "BOM",
         path: "/bom",
         icon: ClipboardList,
-        roles: ["ADMIN", "GL"],
+        roles: ["ADMIN", "GL"], // Legacy fallback if needed, or use PLANIFICATION_VIEW?
       },
       {
         name: "Panneaux",
@@ -77,13 +79,13 @@ const menuGroups = [
         name: "Planification",
         path: "/planification",
         icon: Calendar,
-        roles: ["ADMIN", "GL", "SUPERVISEUR"],
+        permission: PERMISSIONS.PLANIFICATION_VIEW,
       },
       {
         name: "Mouv. stock",
         path: "/mouvements-stock",
         icon: ArrowLeftRight,
-        roles: ["ADMIN", "GL", "OPERATEUR"],
+        permission: PERMISSIONS.STOCK_MOVEMENT_MANAGE,
       },
       {
         name: "Contrôle KHM",
@@ -96,14 +98,12 @@ const menuGroups = [
         path: "/reservation",
         icon: PackageCheck,
         roles: ["ADMIN"],
-        // badge: 3,
       },
       {
         name: "Reception",
         path: "/commande",
         icon: ShoppingCart,
         roles: ["ADMIN"],
-        // badge: 5,
       },
     ],
   },
@@ -114,32 +114,31 @@ const menuGroups = [
         name: "KPIs Maintenance",
         path: "/kpis",
         icon: BarChart3,
-        roles: ["ADMIN", "SUPERVISEUR", "GL"],
+        permission: PERMISSIONS.INTERVENTIONS_VIEW,
       },
       {
         name: "Interventions",
         path: "/interventions",
         icon: Wrench,
-        roles: ["ADMIN", "SUPERVISEUR", "GL", "OPERATEUR"],
-        // badge: 2,
+        permission: PERMISSIONS.INTERVENTIONS_VIEW,
       },
       {
         name: "Techniciens",
         path: "/techniciens",
         icon: HardHat,
-        roles: ["ADMIN", "SUPERVISEUR", "GL"],
+        permission: PERMISSIONS.TECHNICIENS_VIEW,
       },
       {
         name: "Préventive",
         path: "/preventive",
         icon: CalendarCheck,
-        roles: ["ADMIN", "SUPERVISEUR", "GL", "OPERATEUR"],
+        permission: PERMISSIONS.PREVENTIVE_VIEW,
       },
       {
         name: "Compétences & Formations",
         path: "/formation",
         icon: GraduationCap,
-        roles: ["ADMIN", "SUPERVISEUR", "GL"],
+        permission: PERMISSIONS.FORMATION_VIEW,
       },
     ],
   },
@@ -150,7 +149,7 @@ const menuGroups = [
         name: "Utilisateurs",
         path: "/utilisateurs",
         icon: Users,
-        roles: ["ADMIN", "MANAGER", "GL", "TL", "SUPERVISEUR"],
+        permission: PERMISSIONS.USERS_VIEW,
       },
       {
         name: "Organigramme",
@@ -408,13 +407,17 @@ export default function Sidebar() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isMobileOpen]);
 
-  // Pre-filter menu groups by user role (memoized)
+  // Pre-filter menu groups by user permissions (memoized)
   const filteredGroups = useMemo(() => {
     if (!user) return [];
     return menuGroups
       .map((group) => ({
         ...group,
-        items: group.items.filter((item) => item.roles.includes(user.role)),
+        items: group.items.filter((item) => {
+          if (item.permission) return hasPermission(user, item.permission);
+          if (item.roles) return item.roles.includes(user.role);
+          return true;
+        }),
       }))
       .filter((group) => group.items.length > 0);
   }, [user]);
