@@ -24,7 +24,7 @@ const updateArticleSchema = z.object({
 
 const entreeSchema = z.object({
   po_reference: z.string().min(1, "La référence PO est requise"),
-  planification_id: z.number().int().optional().nullable(),
+  planification_id: z.string().optional().nullable(),
   article_id: z.string().min(1, "L'ID de l'article est requis"),
   emplacement: z.string().min(1, "L'emplacement est requis"),
   quantite: z.number().int().positive("La quantité doit être supérieure à 0"),
@@ -43,11 +43,12 @@ const sortieSchema = z.object({
 // @access  Private
 const getArticles = async (req, res, next) => {
   try {
-    const { low_stock, search, fournisseur_id, grouped, page, limit, availability } = req.query;
+    const { low_stock, search, fournisseur_id, grouped, page, limit, availability, article_status } = req.query;
 
     // Fast-path optimization for Dashboard Critical Stock Panel
     if (low_stock === 'true' && !page && !limit && !search && !fournisseur_id) {
       const allArticles = await prisma.article.findMany({
+        where: { isActive: true },
         select: {
           id: true,
           nom_article: true,
@@ -71,6 +72,14 @@ const getArticles = async (req, res, next) => {
     }
 
     const where = {};
+
+    if (article_status === 'inactive') {
+      where.isActive = false;
+    } else if (article_status === 'all') {
+      // no filter
+    } else {
+      where.isActive = true;
+    }
 
     if (fournisseur_id) {
       where.fournisseur_id = fournisseur_id;
@@ -413,15 +422,12 @@ const deleteArticle = async (req, res, next) => {
     const hasBlockingDeps = Object.values(dependencies).some((count) => count > 0);
 
     if (hasBlockingDeps) {
-      // Only include non-zero dependencies in the response
-      const nonZeroDeps = Object.fromEntries(
-        Object.entries(dependencies).filter(([, count]) => count > 0)
-      );
-      return res.status(409).json({
-        error: "Impossible de supprimer cet article.",
-        reason: "Cet article est référencé par des enregistrements existants dans le système.",
-        dependencies: nonZeroDeps,
+      // Soft delete
+      await prisma.article.update({
+        where: { id },
+        data: { isActive: false },
       });
+      return res.json({ message: 'Article désactivé avec succès car il est utilisé dans le système.' });
     }
 
     // Step 2: No dependencies — safe to delete
@@ -438,13 +444,40 @@ const deleteArticle = async (req, res, next) => {
   }
 };
 
+const activateArticle = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const articleExists = await prisma.article.findUnique({ where: { id } });
+    if (!articleExists) {
+      return res.status(404).json({ error: "Article non trouvé" });
+    }
+
+    await prisma.article.update({
+      where: { id },
+      data: { isActive: true },
+    });
+    return res.json({ message: 'Article réactivé avec succès.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Search articles (lightweight for AddComponentModal)
 // @route   GET /stock/articles/search
 // @access  Private
 const searchArticlesLight = async (req, res, next) => {
   try {
-    const { q, limit } = req.query;
+    const { q, limit, article_status } = req.query;
     const where = {};
+    
+    if (article_status === 'inactive') {
+      where.isActive = false;
+    } else if (article_status === 'all') {
+      // no filter
+    } else {
+      where.isActive = true;
+    }
+    
     if (q) {
       where.OR = [
         { id: { contains: q, mode: 'insensitive' } },
@@ -1354,6 +1387,7 @@ module.exports = {
   createArticle,
   updateArticle,
   deleteArticle,
+  activateArticle,
   stockEntree,
   stockSortie,
   stockSortieBulk,

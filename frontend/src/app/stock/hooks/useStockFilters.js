@@ -6,6 +6,7 @@ export const useStockFilters = () => {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [availabilityFilter, setAvailabilityFilter] = useState("all"); // all, low_stock, out_of_stock, reserved
+  const [articleStatus, setArticleStatus] = useState("active"); // active, inactive, all
   
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
@@ -21,7 +22,7 @@ export const useStockFilters = () => {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearchTerm, selectedSupplier, availabilityFilter, limit]);
+  }, [debouncedSearchTerm, selectedSupplier, availabilityFilter, articleStatus, limit]);
 
   return {
     searchTerm,
@@ -31,6 +32,8 @@ export const useStockFilters = () => {
     setSelectedSupplier,
     availabilityFilter,
     setAvailabilityFilter,
+    articleStatus,
+    setArticleStatus,
     page,
     setPage,
     limit,

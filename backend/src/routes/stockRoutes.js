@@ -15,7 +15,8 @@ const {
   importStockMovements,
   importStockBatch,
   searchArticlesLight,
-  getArticlesByIds
+  getArticlesByIds,
+  activateArticle
 } = require('../controllers/stockController');
 const { protect, requirePermission } = require('../middlewares/auth');
 
@@ -35,6 +36,7 @@ router.get('/articles/:id/consumption', getArticleConsumption);
 router.post('/articles', requirePermission('STOCK_CREATE'), createArticle);
 router.put('/articles/:id', requirePermission('STOCK_EDIT'), updateArticle);
 router.delete('/articles/:id', requirePermission('STOCK_DELETE'), deleteArticle);
+router.patch('/articles/:id/activate', requirePermission('STOCK_DELETE'), activateArticle);
 
 // Movements
 router.post('/entrees', requirePermission('STOCK_MOVEMENT_MANAGE'), stockEntree);

@@ -407,4 +407,73 @@ describe('P0-B — Central Stock Service & Logic Tests', () => {
       expect(mvts.length).toBe(0);
     });
   });
+
+  describe('Soft Delete / Deactivation', () => {
+    it('Test 9 — Soft delete changes isActive to false and keeps historical data', async () => {
+      // Add a dependency to trigger soft delete
+      await prisma.mouvementStock.create({
+        data: {
+          article_id: 'A001',
+          type: 'ENTREE',
+          emplacement: 'LOC-MAIN',
+          quantite: 10,
+          reste: 110,
+        }
+      });
+
+      const res = await request(app)
+        .delete(`/stock/articles/A001`)
+        .set('Authorization', `Bearer ${token}`)
+        .send();
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('désactivé');
+
+      const art = await prisma.article.findUnique({ where: { id: 'A001' } });
+      expect(art.isActive).toBe(false);
+
+      // Verify movement is intact
+      const mvts = await prisma.mouvementStock.findMany({ where: { article_id: 'A001' } });
+      expect(mvts.length).toBe(1);
+    });
+
+    it('Test 10 — Deactivated Article does not appear in normal list but appears in inactive list', async () => {
+      await prisma.article.update({
+        where: { id: 'A001' },
+        data: { isActive: false }
+      });
+
+      // Normal list (isActive: true)
+      const resActive = await request(app)
+        .get(`/stock/articles`)
+        .set('Authorization', `Bearer ${token}`)
+        .send();
+      expect(resActive.body.data.some(a => a.id === 'A001')).toBe(false);
+
+      // Inactive list (isActive: false)
+      const resInactive = await request(app)
+        .get(`/stock/articles?article_status=inactive`)
+        .set('Authorization', `Bearer ${token}`)
+        .send();
+      expect(resInactive.body.data.some(a => a.id === 'A001')).toBe(true);
+    });
+
+    it('Test 11 — Deactivated Article can be reactivated', async () => {
+      await prisma.article.update({
+        where: { id: 'A001' },
+        data: { isActive: false }
+      });
+
+      const res = await request(app)
+        .patch(`/stock/articles/A001/activate`)
+        .set('Authorization', `Bearer ${token}`)
+        .send();
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('réactivé');
+
+      const art = await prisma.article.findUnique({ where: { id: 'A001' } });
+      expect(art.isActive).toBe(true);
+    });
+  });
 });

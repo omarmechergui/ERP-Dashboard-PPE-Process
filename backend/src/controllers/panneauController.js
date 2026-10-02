@@ -179,6 +179,19 @@ const createPanneau = async (req, res, next) => {
     const bom_id = req.body.bom_id || null;
     const entrepot_id = req.body.entrepot_id || null;
 
+    const normalizedPlanificationId = 
+      typeof planification_id === 'string' && planification_id.trim() !== '' 
+        ? planification_id.trim() 
+        : null;
+
+    if (normalizedPlanificationId && !/^[0-9a-fA-F]{24}$/.test(normalizedPlanificationId)) {
+      return res.status(400).json({
+        success: false,
+        code: "VALIDATION_ERROR",
+        message: "planification_id invalide"
+      });
+    }
+
     const payload = {
       id,
       title_panneau,
@@ -192,7 +205,7 @@ const createPanneau = async (req, res, next) => {
       bom_id,
       entrepot_id,
       superviseur_id,
-      planification_id,
+      planification_id: normalizedPlanificationId,
     };
     
     // Quick validation ignoring some strict fields if we didn't update the Zod schema yet
@@ -279,6 +292,19 @@ const updatePanneau = async (req, res, next) => {
     }
 
     const data = { ...validation.data };
+
+    if (data.planification_id !== undefined) {
+      const pId = data.planification_id;
+      const normalized = typeof pId === 'string' && pId.trim() !== '' ? pId.trim() : null;
+      if (normalized && !/^[0-9a-fA-F]{24}$/.test(normalized)) {
+        return res.status(400).json({
+          success: false,
+          code: "VALIDATION_ERROR",
+          message: "planification_id invalide"
+        });
+      }
+      data.planification_id = normalized;
+    }
 
     // Resolve supervisor ID if a matricule was provided
     if (data.superviseur_id) {

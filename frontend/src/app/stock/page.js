@@ -32,14 +32,15 @@ export default function StockPage() {
     debouncedSearchTerm,
     selectedSupplier, setSelectedSupplier,
     availabilityFilter, setAvailabilityFilter,
+    articleStatus, setArticleStatus,
     page, setPage, limit, setLimit
   } = useStockFilters();
 
   const { 
     articles, pagination, stats: backendStats, loading: stockLoading, error: stockError, 
-    fetchArticles, addArticle, updateArticle, deleteArticle 
+    fetchArticles, addArticle, updateArticle, deleteArticle, activateArticle
   } = useStock({
-    page, limit, debouncedSearchTerm, selectedSupplier, availabilityFilter
+    page, limit, debouncedSearchTerm, selectedSupplier, availabilityFilter, articleStatus
   });
   
   const stats = useStockStatistics(articles, backendStats);
@@ -122,6 +123,8 @@ export default function StockPage() {
         setSelectedSupplier={setSelectedSupplier}
         availabilityFilter={availabilityFilter}
         setAvailabilityFilter={setAvailabilityFilter}
+        articleStatus={articleStatus}
+        setArticleStatus={setArticleStatus}
         suppliers={suppliers}
       />
 
@@ -135,6 +138,7 @@ export default function StockPage() {
         isWriteAllowed={isWriteAllowed}
         onEdit={openEditModal}
         onDelete={deleteArticle}
+        onActivate={activateArticle}
         onRowClick={handleRowClick}
       />
 

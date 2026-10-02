@@ -1,10 +1,10 @@
 import React from "react";
-import { Edit3, ChevronRight, PackageSearch, Trash2 } from "lucide-react";
+import { Edit3, ChevronRight, PackageSearch, Trash2, Power } from "lucide-react";
 import { StockStatusBadge } from "./StockStatusBadge";
 import { StockQuantityBar } from "./StockQuantityBar";
 import { formatCurrency, formatQuantity } from "../utils/stockFormatters";
 
-export const StockTable = ({ articles, loading, pagination, onPageChange, limit, onLimitChange, isWriteAllowed, onEdit, onDelete, onRowClick }) => {
+export const StockTable = ({ articles, loading, pagination, onPageChange, limit, onLimitChange, isWriteAllowed, onEdit, onDelete, onActivate, onRowClick }) => {
   if (articles.length === 0) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
@@ -59,8 +59,13 @@ export const StockTable = ({ articles, loading, pagination, onPageChange, limit,
                   <td className="p-4 font-mono font-medium text-slate-500">
                     {art.id}
                   </td>
-                  <td className="p-4 font-semibold text-slate-900">
+                  <td className="p-4 font-semibold text-slate-900 flex items-center gap-2">
                     {art.nom_article}
+                    {art.isActive === false && (
+                      <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs font-medium border border-slate-200">
+                        Inactif
+                      </span>
+                    )}
                   </td>
                   <td className="p-4 text-slate-500 truncate max-w-[150px]" title={art.fournisseur?.nom}>
                     {art.fournisseur?.nom || "-"}
@@ -97,42 +102,42 @@ export const StockTable = ({ articles, loading, pagination, onPageChange, limit,
                           <Edit3 className="h-4 w-4" />
                         </button>
                       )}
-                      {isWriteAllowed && onDelete && (
+                      {isWriteAllowed && onDelete && art.isActive !== false && (
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (window.confirm(`Êtes-vous sûr de vouloir supprimer l'article ${art.id} (${art.nom_article}) ?`)) {
+                            if (window.confirm(`Désactiver cet article ?\n\nCet article est utilisé dans le système.\nIl sera retiré des articles actifs mais son historique sera conservé.`)) {
                               try {
                                 await onDelete(art.id);
-                                alert(`Article ${art.id} supprimé avec succès.`);
+                                alert(`Article désactivé avec succès.`);
                               } catch (err) {
-                                const status = err?.response?.status;
-                                const data = err?.response?.data;
-
-                                if (status === 409 && data?.dependencies) {
-                                  const depLabels = {
-                                    mouvementsStock: 'Mouvements de stock',
-                                    bomLines: 'Lignes BOM',
-                                    reservationLignes: 'Réservations',
-                                    commandeLignes: 'Lignes de commande',
-                                    panneauScraps: 'Rebuts panneau',
-                                    stockLocations: 'Emplacements stock',
-                                    interventionParts: 'Pièces d\'intervention',
-                                  };
-                                  const details = Object.entries(data.dependencies)
-                                    .map(([key, count]) => `• ${depLabels[key] || key}: ${count} enregistrement(s)`)
-                                    .join('\n');
-                                  alert(`${data.error}\n\n${data.reason}\n\n${details}`);
-                                } else {
-                                  alert(err.message || `Erreur lors de la suppression de l'article ${art.id}.`);
-                                }
+                                alert(err.message || `Erreur lors de la suppression de l'article ${art.id}.`);
                               }
                             }
                           }}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-100 rounded-md transition-colors"
-                          title="Delete"
+                          title="Désactiver"
                         >
                           <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      {isWriteAllowed && onActivate && art.isActive === false && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Réactiver cet article ?`)) {
+                              try {
+                                await onActivate(art.id);
+                                alert(`Article réactivé avec succès.`);
+                              } catch (err) {
+                                alert(err.message || `Erreur lors de la réactivation de l'article ${art.id}.`);
+                              }
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-100 rounded-md transition-colors"
+                          title="Réactiver"
+                        >
+                          <Power className="h-4 w-4" />
                         </button>
                       )}
                       <ChevronRight className="h-4 w-4 text-slate-300" />

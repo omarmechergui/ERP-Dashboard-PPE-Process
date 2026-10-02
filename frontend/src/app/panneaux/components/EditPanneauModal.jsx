@@ -11,7 +11,7 @@ export default function EditPanneauModal({ isOpen, onClose, onSubmit, panneau, b
     bom_id: "",
     entrepot_id: "",
     superviseur_id: "",
-    planification_id: ""
+    planification_id: null
   });
   const [error, setError] = useState("");
 
@@ -23,7 +23,7 @@ export default function EditPanneauModal({ isOpen, onClose, onSubmit, panneau, b
         bom_id: panneau.bom_id ? String(panneau.bom_id) : (boms.length > 0 ? String(boms[0].id) : ""),
         entrepot_id: panneau.entrepot_id ? String(panneau.entrepot_id) : "",
         superviseur_id: panneau.superviseur_id ? String(panneau.superviseur_id) : (supervisors.length > 0 ? String(supervisors[0].matricule || supervisors[0].id) : ""),
-        planification_id: panneau.planification_id ? String(panneau.planification_id) : ""
+        planification_id: panneau.planification_id ? String(panneau.planification_id) : null
       });
       setError("");
     }

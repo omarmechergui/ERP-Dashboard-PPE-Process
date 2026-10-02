@@ -29,6 +29,9 @@ export const useStock = (filters = {}) => {
       if (filters.availabilityFilter && filters.availabilityFilter !== 'all') {
         params.availability = filters.availabilityFilter;
       }
+      if (filters.articleStatus) {
+        params.article_status = filters.articleStatus;
+      }
 
       const res = await API.get("/stock/articles", { 
         params,
@@ -52,7 +55,7 @@ export const useStock = (filters = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [filters.page, filters.limit, filters.debouncedSearchTerm, filters.selectedSupplier, filters.availabilityFilter]);
+  }, [filters.page, filters.limit, filters.debouncedSearchTerm, filters.selectedSupplier, filters.availabilityFilter, filters.articleStatus]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -79,6 +82,11 @@ export const useStock = (filters = {}) => {
     await fetchArticles();
   };
 
+  const activateArticle = async (id) => {
+    await API.patch(`/stock/articles/${id}/activate`);
+    await fetchArticles();
+  };
+
   return {
     articles,
     pagination,
@@ -89,5 +97,6 @@ export const useStock = (filters = {}) => {
     addArticle,
     updateArticle,
     deleteArticle,
+    activateArticle,
   };
 };

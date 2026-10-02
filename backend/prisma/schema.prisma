@@ -95,6 +95,7 @@ model Article {
   reserved_qty   Int         @default(0)
   min_stock      Int         @default(100)
   address        String
+  isActive       Boolean     @default(true)
   fournisseur_id String @db.ObjectId
   fournisseur    Fournisseur @relation(fields: [fournisseur_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 

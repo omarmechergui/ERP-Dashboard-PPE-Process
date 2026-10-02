@@ -12,7 +12,7 @@ export default function CreatePanneauModal({ isOpen, onClose, onSubmit, boms, en
     bom_id: "",
     entrepot_id: "",
     superviseur_id: "",
-    planification_id: ""
+    planification_id: null
   });
   const [error, setError] = useState("");
 
@@ -25,7 +25,7 @@ export default function CreatePanneauModal({ isOpen, onClose, onSubmit, boms, en
         bom_id: boms.length > 0 ? String(boms[0].id) : "",
         entrepot_id: "", // Force user to select
         superviseur_id: supervisors.length > 0 ? String(supervisors[0].matricule || supervisors[0].id) : "",
-        planification_id: ""
+        planification_id: null
       });
       setError("");
     }

@@ -8,6 +8,8 @@ export const StockFilters = ({
   setSelectedSupplier, 
   availabilityFilter, 
   setAvailabilityFilter, 
+  articleStatus,
+  setArticleStatus,
   suppliers 
 }) => {
   return (
@@ -62,6 +64,15 @@ export const StockFilters = ({
           {suppliers.map((f) => (
             <option key={f.id} value={f.id}>{f.nom}</option>
           ))}
+        </select>
+        <select
+          value={articleStatus}
+          onChange={(e) => setArticleStatus(e.target.value)}
+          className="w-full sm:w-40 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 cursor-pointer"
+        >
+          <option value="all">Tous</option>
+          <option value="active">Actifs</option>
+          <option value="inactive">Inactifs</option>
         </select>
       </div>
     </div>
