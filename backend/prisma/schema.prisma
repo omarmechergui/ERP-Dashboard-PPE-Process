@@ -134,8 +134,8 @@ model BomLigne {
   id String @id @default(auto()) @map("_id") @db.ObjectId
   bom_id String @db.ObjectId
   bom        BOM     @relation(fields: [bom_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  article_id String
-  article    Article @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  article_id String?
+  article    Article? @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   quantite   Float // Quantité nécessaire (ex: 40 pièces, 15 mètres)
   prix       Float // Prix de l'article au moment de la BOM
 
@@ -236,8 +236,8 @@ model MouvementStock {
   planification_id String? @db.ObjectId // Uniquement pour ENTREE
   planification    Planification? @relation(fields: [planification_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   panneau_id       String? // Uniquement pour SORTIE vers panneau (pour éviter double déduction)
-  article_id       String
-  article          Article        @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  article_id       String?
+  article          Article?       @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   emplacement      String // Emplacement dans le stock (ex: A-12)
   quantite         Int
   etat             Boolean? // Reçu oui/non (pour ENTREE)
@@ -277,8 +277,8 @@ model ReservationLigne {
   id String @id @default(auto()) @map("_id") @db.ObjectId
   reservation_id String @db.ObjectId
   reservation    Reservation @relation(fields: [reservation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  article_id     String
-  article        Article     @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  article_id     String?
+  article        Article?    @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   quantite       Int
   prix           Float // Unit price at the time of the order
 }
@@ -300,8 +300,8 @@ model CommandeLigne {
   id String @id @default(auto()) @map("_id") @db.ObjectId
   commande_id String @db.ObjectId
   commande    Commande @relation(fields: [commande_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  article_id  String
-  article     Article  @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  article_id  String?
+  article     Article? @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   quantite    Int
   prix        Float
 }
@@ -357,8 +357,8 @@ model PanneauScrap {
   id String @id @default(auto()) @map("_id") @db.ObjectId
   panneau_id         String
   panneau            Panneau         @relation(fields: [panneau_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  article_id         String
-  article            Article         @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  article_id         String?
+  article            Article?        @relation(fields: [article_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   scrap_quantity     Int
   planned_quantity   Int?
   reason             String?

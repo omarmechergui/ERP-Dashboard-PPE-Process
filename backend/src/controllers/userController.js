@@ -201,10 +201,10 @@ const updateUser = async (req, res, next) => {
     }
 
     const updateData = { ...validation.data };
-    
+
     // Explicit null assignments if empty strings are sent to clear them
     if (updateData.phoneNumber === "") updateData.phoneNumber = null;
-    
+
     if (updateData.department !== undefined) updateData.department = updateData.department;
     if (updateData.position !== undefined) updateData.position = updateData.position;
 
@@ -238,11 +238,11 @@ const updateUser = async (req, res, next) => {
       const activeSubordinates = await prisma.user.findMany({
         where: { managerId: existingUser.id, statut: 'ACTIF' }
       });
-      
+
       if (activeSubordinates.length > 0) {
         const allowedSubordinateRoles = VALID_SUBORDINATE_ROLES[targetRole] || [];
         const invalidSubordinates = activeSubordinates.filter(sub => !allowedSubordinateRoles.includes(sub.role));
-        
+
         if (invalidSubordinates.length > 0) {
           throw new AppError(
             `Le nouveau rôle ${targetRole} ne permet pas de gérer certains des subordonnés actuels (${invalidSubordinates.map(u => u.nom).join(', ')}). Veuillez les réassigner d'abord.`,
@@ -325,19 +325,19 @@ const deleteUser = async (req, res, next) => {
 const uploadUserPhoto = async (req, res, next) => {
   try {
     const { id } = req.params;
-    
+
     if (!req.file) {
       throw new AppError("Aucun fichier fourni", 400, 'NO_FILE');
     }
-    
+
     const photoUrl = `/uploads/photos/${req.file.filename}`;
-    
+
     const user = await prisma.user.update({
       where: { id: id },
       data: { photoUrl },
       select: { id: true, photoUrl: true }
     });
-    
+
     res.json(user);
   } catch (error) {
     next(error);

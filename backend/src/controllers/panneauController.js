@@ -107,9 +107,9 @@ const getPanneaux = async (req, res, next) => {
       let composants = [];
       if (p.bom && p.bom.lignes) {
         composants = p.bom.lignes.map(l => ({
-          nom: l.article.nom_article,
+          nom: l.article?.nom_article || 'Article inconnu',
           requis: l.quantite,
-          stock: l.article.quantite
+          stock: l.article?.quantite ?? 0
         }));
       }
       return {
